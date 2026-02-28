@@ -1,0 +1,22 @@
+# Claude Code
+.claude/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Environment / secrets
+.env
+.env.*
+*.key
+*.pem
+credentials.json

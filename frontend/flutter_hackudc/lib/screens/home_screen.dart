@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/chat_message.dart';
 import '../services/denodo_service.dart';
+import '../services/download_helper.dart';
 
 const _kSidebarWidth = 180.0;
 const _kSidebarColor = Color(0xFFD96E6E);
@@ -20,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   var _selectedDatabase = 'BD Mec';
   final _messages = <ChatMessage>[];
   var _isLoading = false;
+  var _loadingPhase = '';
   var _showOptions = false;
   var _selectedModel = 'Turbo';
   final _inputController = TextEditingController();
@@ -33,29 +37,36 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _sendMessage() async {
-    final text = _inputController.text.trim();
+  Future<void> _sendMessage([String? overrideText]) async {
+    final text = overrideText ?? _inputController.text.trim();
     if (text.isEmpty || _isLoading) return;
 
     setState(() {
       _messages.add(ChatMessage(content: text, isUser: true));
       _isLoading = true;
+      _loadingPhase = 'Analizando consulta...';
       _showOptions = false;
-      _inputController.clear();
+      if (overrideText == null) _inputController.clear();
     });
 
     _scrollToBottom();
 
+    final wantsPlot = RegExp(r'gr[aá]fic|plot|chart|diagrama', caseSensitive: false)
+        .hasMatch(text);
+
+    setState(() => _loadingPhase = 'Consultando base de datos...');
+
     final response = await DenodoService.query(
       question: text,
-      database: _selectedDatabase,
-      model: _selectedModel.toLowerCase(),
+      databaseNames: _selectedDatabase,
+      plot: wantsPlot,
     );
 
     if (mounted) {
       setState(() {
-        _messages.add(ChatMessage(content: response, isUser: false));
+        _messages.add(ChatMessage.fromApiResponse(response));
         _isLoading = false;
+        _loadingPhase = '';
       });
       _scrollToBottom();
     }
@@ -174,12 +185,31 @@ class _HomeScreenState extends State<HomeScreen> {
   // ── Main content ─────────────────────────────────────────────────────────
 
   Widget _buildMainContent() {
+    if (_messages.isEmpty) {
+      return Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: Column(
+              children: [
+                const Spacer(flex: 2),
+                _buildWelcome(),
+                const SizedBox(height: 128),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildInputBarContent(),
+                ),
+                const Spacer(flex: 2),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       children: [
         _buildHeader(),
-        Expanded(
-          child: _messages.isEmpty ? _buildWelcome() : _buildChat(),
-        ),
+        Expanded(child: _buildChat()),
         _buildInputBar(),
       ],
     );
@@ -211,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Text(
         'En que te ayudamos hoy?',
         style: const TextStyle(
-          fontSize: 32,
+          fontSize: 42,
           fontWeight: FontWeight.w400,
           color: _kAccentColor,
         ),
@@ -233,10 +263,22 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: _messages.length + (_isLoading ? 1 : 0),
             itemBuilder: (context, index) {
               if (index == _messages.length) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(
-                    child: CircularProgressIndicator(color: _kAccentColor),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Column(
+                    children: [
+                      const CircularProgressIndicator(color: _kAccentColor),
+                      if (_loadingPhase.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          _loadingPhase,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF999999),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 );
               }
@@ -256,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMessage(ChatMessage msg, bool showDots) {
+  Widget _buildMessage(ChatMessage msg, bool showExtras) {
     if (msg.isUser) {
       return Align(
         alignment: Alignment.centerRight,
@@ -271,30 +313,83 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Text(
             msg.content,
             style: const TextStyle(
-                fontSize: 14, color: Color(0xFF333333)),
+                fontSize: 18, color: Color(0xFF333333)),
           ),
         ),
       );
     }
+
+    final api = msg.apiResponse;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Respuesta de texto
           SelectableText(
             msg.content,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 18,
               color: Color(0xFF333333),
               height: 1.6,
             ),
           ),
-          if (showDots)
+
+          // Razonamiento (SQL + explicacion)
+          if (api?.sqlQuery != null || api?.queryExplanation != null) ...[
+            const SizedBox(height: 12),
+            _buildReasoning(api!),
+          ],
+
+          // Grafica SVG
+          if (api?.rawGraph != null) ...[
+            const SizedBox(height: 12),
+            _buildGraph(api!.rawGraph!),
+          ],
+
+          // Preguntas relacionadas
+          if (showExtras && api != null && api.relatedQuestions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Preguntas relacionadas:',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF555555),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...api.relatedQuestions.map((q) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: InkWell(
+                    onTap: () => _sendMessage(q),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFDDDDDD)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        q,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: _kAccentColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                )),
+          ],
+
+          // Boton de opciones
+          if (showExtras)
             Align(
               alignment: Alignment.centerRight,
               child: IconButton(
-                tooltip: 'Más opciones',
+                tooltip: 'Mas opciones',
                 icon: const Icon(Icons.more_horiz, size: 22),
                 color: const Color(0xFF777777),
                 onPressed: () =>
@@ -304,6 +399,153 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildReasoning(ApiResponse api) {
+    return ExpansionTile(
+      tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+      childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: Color(0xFFE0E0E0)),
+      ),
+      collapsedShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: Color(0xFFE0E0E0)),
+      ),
+      backgroundColor: Colors.white,
+      collapsedBackgroundColor: Colors.white,
+      title: const Text(
+        'Ver razonamiento',
+        style: TextStyle(fontSize: 13, color: Color(0xFF555555)),
+      ),
+      leading: const Icon(Icons.psychology, size: 20, color: Color(0xFF555555)),
+      children: [
+        if (api.queryExplanation != null) ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Explicacion:',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF555555),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          SelectableText(
+            api.queryExplanation!,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF666666), height: 1.5),
+          ),
+        ],
+        if (api.sqlQuery != null) ...[
+          const SizedBox(height: 10),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Consulta SQL:',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF555555),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2D2D2D),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: SelectableText(
+              api.sqlQuery!,
+              style: const TextStyle(
+                fontSize: 12,
+                fontFamily: 'monospace',
+                color: Color(0xFF66FF66),
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+        if (api.tablesUsed.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Tablas usadas: ${api.tablesUsed.join(", ")}',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildGraph(String dataUri) {
+    // El raw_graph viene como "data:image/svg+xml;base64,..."
+    try {
+      final base64Str = dataUri.split(',').last;
+      final svgString = utf8.decode(base64Decode(base64Str));
+      return Container(
+        constraints: const BoxConstraints(maxHeight: 350),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+        ),
+        padding: const EdgeInsets.all(8),
+        child: Stack(
+          children: [
+            SvgPicture.string(
+              svgString,
+              fit: BoxFit.contain,
+            ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                tooltip: 'Descargar grafica',
+                icon: const Icon(Icons.download, size: 20),
+                color: const Color(0xFF555555),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.85),
+                ),
+                onPressed: () => _saveGraph(svgString),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+  }
+
+  Future<void> _saveGraph(String svgContent) async {
+    try {
+      final path = await saveSvgFile(svgContent);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Grafica guardada: $path'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   // ── Options panel ─────────────────────────────────────────────────────────
@@ -355,68 +597,102 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildInputBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       color: _kBgColor,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFCCCCCC)),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 6),
-            _buildModelDropdown(),
-            const SizedBox(width: 4),
-            Expanded(
-              child: TextField(
-                controller: _inputController,
-                decoration: const InputDecoration(
-                  hintText: 'Escriba la consulta',
-                  hintStyle:
-                      TextStyle(color: Color(0xFFAAAAAA), fontSize: 14),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 14),
-                ),
-                style: const TextStyle(fontSize: 14),
-                onSubmitted: (_) => _sendMessage(),
-                textInputAction: TextInputAction.send,
+      child: _buildInputBarContent(),
+    );
+  }
+
+  Widget _buildInputBarContent() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFCCCCCC)),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 10),
+          _buildModelDropdown(),
+          const SizedBox(width: 16),
+          Expanded(
+            child: TextField(
+              controller: _inputController,
+              decoration: const InputDecoration(
+                hintText: 'Escriba la consulta',
+                hintStyle:
+                    TextStyle(color: Color(0xFFAAAAAA), fontSize: 20),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 20),
               ),
+              style: const TextStyle(fontSize: 18),
+              onSubmitted: (_) => _sendMessage(),
+              textInputAction: TextInputAction.send,
             ),
-            IconButton(
-              icon: const Icon(Icons.send_rounded),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: const Icon(Icons.send_rounded, size: 26),
               color: _kAccentColor,
               tooltip: 'Enviar',
-              onPressed: _isLoading ? null : _sendMessage,
+              onPressed: _isLoading ? null : () => _sendMessage(),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildModelDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFCCCCCC)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedModel,
-          isDense: true,
-          items: _models
-              .map(
-                (m) => DropdownMenuItem(
-                  value: m,
-                  child: Text(m,
-                      style: const TextStyle(fontSize: 13)),
+    return PopupMenuButton<String>(
+      initialValue: _selectedModel,
+      onSelected: (v) => setState(() => _selectedModel = v),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
+      color: const Color(0xFF333333),
+      itemBuilder: (context) => _models.map((m) {
+        final isSelected = m == _selectedModel;
+        return PopupMenuItem<String>(
+          value: m,
+          child: Row(
+            children: [
+              Icon(
+                Icons.check,
+                size: 16,
+                color: isSelected ? _kBgColor : Colors.transparent,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                m,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: _kBgColor,
                 ),
-              )
-              .toList(),
-          onChanged: (v) =>
-              v != null ? setState(() => _selectedModel = v) : null,
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF333333),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _selectedModel,
+              style: const TextStyle(fontSize: 16, color: _kBgColor),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_arrow_down,
+                size: 18, color: _kBgColor),
+          ],
         ),
       ),
     );

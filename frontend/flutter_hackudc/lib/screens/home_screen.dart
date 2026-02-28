@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
@@ -701,12 +702,42 @@ class _MessageBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SelectableText(
-            message.content,
-            style: const TextStyle(
-              fontSize: 18,
-              color: Color(0xFF333333),
-              height: 1.6,
+          MarkdownBody(
+            data: message.content,
+            selectable: true,
+            styleSheet: MarkdownStyleSheet(
+              p: const TextStyle(fontSize: 16, color: Color(0xFF333333), height: 1.6),
+              h1: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+              h2: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+              h3: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+              strong: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+              em: const TextStyle(fontStyle: FontStyle.italic, color: Color(0xFF555555)),
+              code: const TextStyle(
+                fontSize: 13,
+                fontFamily: 'monospace',
+                color: Color(0xFF66FF66),
+                backgroundColor: Color(0xFF2D2D2D),
+              ),
+              codeblockDecoration: BoxDecoration(
+                color: const Color(0xFF2D2D2D),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              codeblockPadding: const EdgeInsets.all(12),
+              blockquoteDecoration: const BoxDecoration(
+                color: Color(0xFFF5F5F5),
+                border: Border(left: BorderSide(color: _kAccentColor, width: 4)),
+              ),
+              blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+              blockquote: const TextStyle(fontSize: 15, color: Color(0xFF555555), fontStyle: FontStyle.italic),
+              tableHead: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+              tableBody: const TextStyle(fontSize: 14, color: Color(0xFF333333)),
+              tableBorder: TableBorder.all(color: const Color(0xFFE0E0E0), width: 1),
+              tableColumnWidth: const FlexColumnWidth(),
+              tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              listBullet: const TextStyle(fontSize: 16, color: _kAccentColor),
+              horizontalRuleDecoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Color(0xFFE0E0E0), width: 1)),
+              ),
             ),
           ),
           if (api?.sqlQuery != null || api?.queryExplanation != null) ...[

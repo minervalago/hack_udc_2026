@@ -53,4 +53,4 @@ app.*.map.json
 credentials.json
 
 # Firebase
-frontend/flutter_hackudc/lib/firebase_options.dart
+lib/firebase_options.dart

@@ -55,18 +55,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Consumer<QueryProvider>(
       builder: (context, provider, _) => Scaffold(
         backgroundColor: _kBgColor,
+        drawer: isMobile
+            ? Drawer(
+                width: _kSidebarWidth,
+                child: _Sidebar(provider: provider, isMobile: true),
+              )
+            : null,
         body: Row(
           children: [
-            _Sidebar(provider: provider),
-            Expanded(child: _MainContent(
-              provider: provider,
-              inputController: _inputController,
-              scrollController: _scrollController,
-              onSend: (text) => _send(provider, text),
-            )),
+            if (!isMobile) _Sidebar(provider: provider),
+            Expanded(
+              child: _MainContent(
+                provider: provider,
+                inputController: _inputController,
+                scrollController: _scrollController,
+                onSend: (text) => _send(provider, text),
+              ),
+            ),
           ],
         ),
       ),
@@ -77,8 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.provider});
+  const _Sidebar({required this.provider, this.isMobile = false});
   final QueryProvider provider;
+  final bool isMobile;
 
   @override
   Widget build(BuildContext context) {
@@ -86,46 +96,53 @@ class _Sidebar extends StatelessWidget {
     return Container(
       width: _kSidebarWidth,
       color: _kSidebarColor,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _DatabaseSelector(provider: provider),
-          const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
-          InkWell(
-            onTap: provider.newChat,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Icon(Icons.add, color: Colors.white, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    'Nuevo chat',
-                    style: TextStyle(color: Colors.white, fontSize: 14),
-                  ),
-                ],
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _DatabaseSelector(provider: provider),
+            const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
+            InkWell(
+              onTap: () {
+                provider.newChat();
+                if (isMobile) Scaffold.of(context).closeDrawer();
+              },
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.add, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'Nuevo chat',
+                      style: TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(top: 4),
-              itemCount: sessions.length,
-              itemBuilder: (context, index) {
-                final session = sessions[index];
-                final isSelected = session == provider.currentSession;
-                return _SessionTile(
-                  session: session,
-                  isSelected: isSelected,
-                  provider: provider,
-                );
-              },
+            const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(top: 4),
+                itemCount: sessions.length,
+                itemBuilder: (context, index) {
+                  final session = sessions[index];
+                  final isSelected = session == provider.currentSession;
+                  return _SessionTile(
+                    session: session,
+                    isSelected: isSelected,
+                    provider: provider,
+                    onSelect: isMobile ? () => Scaffold.of(context).closeDrawer() : null,
+                  );
+                },
+              ),
             ),
-          ),
-          const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
-          _UserTile(),
-        ],
+            const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
+            _UserTile(),
+          ],
+        ),
       ),
     );
   }
@@ -136,16 +153,21 @@ class _SessionTile extends StatelessWidget {
     required this.session,
     required this.isSelected,
     required this.provider,
+    this.onSelect,
   });
 
   final ChatSession session;
   final bool isSelected;
   final QueryProvider provider;
+  final VoidCallback? onSelect;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => provider.loadSession(session),
+      onTap: () {
+        provider.loadSession(session);
+        onSelect?.call();
+      },
       child: Container(
         padding: const EdgeInsets.only(left: 16, right: 4, top: 10, bottom: 10),
         color: isSelected
@@ -505,20 +527,36 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: EdgeInsets.only(
+        left: isMobile ? 4 : 20,
+        right: 20,
+        top: 14,
+        bottom: 14,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFE0E0E0))),
       ),
-      child: const Text(
-        'Administrador de becas',
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: Color(0xFF333333),
-        ),
+      child: Row(
+        children: [
+          if (isMobile)
+            IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF333333)),
+              tooltip: 'Menú',
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          const Text(
+            'Administrador de becas',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF333333),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -529,10 +567,11 @@ class _WelcomeText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Text(
+    final fontSize = MediaQuery.of(context).size.width < 600 ? 28.0 : 42.0;
+    return Text(
       '¿En qué te ayudamos hoy?',
       style: TextStyle(
-        fontSize: 42,
+        fontSize: fontSize,
         fontWeight: FontWeight.w400,
         color: _kAccentColor,
       ),
@@ -638,10 +677,11 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (message.isUser) {
+      final leftMargin = MediaQuery.of(context).size.width < 600 ? 40.0 : 80.0;
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 16, left: 80),
+          margin: EdgeInsets.only(bottom: 16, left: leftMargin),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFFE0E0E0),

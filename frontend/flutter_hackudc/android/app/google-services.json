@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1097696584923",
+    "project_id": "denodo-hackudc-2026",
+    "storage_bucket": "denodo-hackudc-2026.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1097696584923:android:c9c6fb3a59a3c4a96398fe",
+        "android_client_info": {
+          "package_name": "com.example.flutter_hackudc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGRTGFxcQxRO8lqTex-MwD5Z2SJnxxRC8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

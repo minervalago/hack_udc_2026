@@ -1,13 +1,15 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../providers/query_provider.dart';
+import '../services/auth_service.dart';
 import '../services/denodo_service.dart';
 import '../services/download_helper.dart';
 
-const _kSidebarWidth = 180.0;
+const _kSidebarWidth = 220.0;
 const _kSidebarColor = Color(0xFFD96E6E);
 const _kSidebarDividerColor = Color(0xFFC45555);
 const _kAccentColor = Color(0xFFD96E6E);
@@ -79,42 +81,57 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sessions = provider.sessions;
     return Container(
       width: _kSidebarWidth,
       color: _kSidebarColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.only(top: 20),
-              itemCount: provider.databases.length,
-              separatorBuilder: (context, index) => const Divider(
-                color: _kSidebarDividerColor,
-                height: 1,
-                thickness: 1,
-                indent: 16,
-                endIndent: 16,
+          _DatabaseSelector(provider: provider),
+          const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
+          InkWell(
+            onTap: provider.newChat,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.add, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Nuevo chat',
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                ],
               ),
+            ),
+          ),
+          const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.only(top: 4),
+              itemCount: sessions.length,
               itemBuilder: (context, index) {
-                final db = provider.databases[index];
-                final isSelected = db == provider.selectedDatabase;
+                final session = sessions[index];
+                final isSelected = session == provider.currentSession;
                 return InkWell(
-                  onTap: () => provider.selectDatabase(db),
+                  onTap: () => provider.loadSession(session),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                        horizontal: 16, vertical: 12),
                     color: isSelected
                         ? Colors.black.withValues(alpha: 0.12)
                         : Colors.transparent,
                     child: Text(
-                      db,
+                      session.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
+                        fontSize: 13,
                         fontWeight: isSelected
                             ? FontWeight.bold
                             : FontWeight.normal,
-                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -123,27 +140,196 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
           const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                const Icon(Icons.account_circle, color: Colors.white, size: 30),
-                const SizedBox(width: 8),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    textStyle: const TextStyle(fontSize: 12),
-                  ),
-                  onPressed: () {},
-                  child: const Text('CUENTA'),
-                ),
-              ],
+          _UserTile(),
+        ],
+      ),
+    );
+  }
+}
+
+class _DatabaseSelector extends StatelessWidget {
+  const _DatabaseSelector({required this.provider});
+  final QueryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    if (provider.loadingDatabases) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
             ),
+            SizedBox(width: 10),
+            Text(
+              'Cargando bases de datos...',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (provider.databasesError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white70, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                provider.databasesError!,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white, size: 16),
+              tooltip: 'Reintentar',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: provider.loadDatabases,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (provider.databases.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Text(
+          'Sin bases de datos',
+          style: TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+      );
+    }
+
+    return PopupMenuButton<String>(
+      initialValue: provider.selectedDatabase,
+      onSelected: provider.selectDatabase,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 4,
+      color: const Color(0xFF333333),
+      itemBuilder: (context) => provider.databases.map((db) {
+        final isSelected = db == provider.selectedDatabase;
+        return PopupMenuItem<String>(
+          value: db,
+          child: Row(
+            children: [
+              Icon(Icons.check,
+                  size: 16,
+                  color: isSelected ? Colors.white : Colors.transparent),
+              const SizedBox(width: 8),
+              Text(
+                db,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight:
+                      isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            const Icon(Icons.storage, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                provider.selectedDatabase,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down,
+                color: Colors.white, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UserInitial extends StatelessWidget {
+  const _UserInitial(this.initial);
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UserTile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final photoUrl = user?.photoURL;
+    final name = user?.displayName ?? user?.email ?? 'Usuario';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: Colors.white30,
+            child: ClipOval(
+              child: photoUrl != null
+                  ? Image.network(
+                      photoUrl,
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _UserInitial(initial),
+                    )
+                  : _UserInitial(initial),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white, size: 18),
+            tooltip: 'Cerrar sesión',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: AuthService.signOut,
           ),
         ],
       ),

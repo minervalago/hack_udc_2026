@@ -18,4 +18,14 @@ class ChatMessage {
       apiResponse: response,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'content': content,
+        'isUser': isUser,
+      };
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
+        content: json['content'] as String? ?? '',
+        isUser: json['isUser'] as bool? ?? false,
+      );
 }

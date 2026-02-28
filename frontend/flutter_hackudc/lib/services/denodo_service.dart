@@ -134,6 +134,26 @@ class DenodoService {
     return ApiResponse.fromJson(data);
   }
 
+  /// Fetches the list of available VDP databases from /getVectorDBInfo.
+  /// Returns the keys under syncedResources.DATABASE.
+  static Future<List<String>> fetchDatabases() async {
+    final uri = Uri.http(_baseUrl, '/getVectorDBInfo');
+    final response = await http
+        .get(uri, headers: _headers)
+        .timeout(_turboTimeout);
+
+    if (response.statusCode != 200) {
+      final body = utf8.decode(response.bodyBytes);
+      final preview = body.length > 300 ? '${body.substring(0, 300)}…' : body;
+      throw Exception('HTTP ${response.statusCode}: $preview');
+    }
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    final synced = data['syncedResources'] as Map<String, dynamic>? ?? {};
+    final dbs = synced['DATABASE'] as Map<String, dynamic>? ?? {};
+    return dbs.keys.toList();
+  }
+
   /// Public entry point. Runs the mandatory two-phase flow:
   ///   1. /answerMetadataQuestion — schema discovery
   ///   2. /answerDataQuestion     — VQL execution + ranking

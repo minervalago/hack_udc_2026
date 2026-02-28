@@ -3,6 +3,9 @@
 Herramienta de apoyo a la decisión basada en IA para filtrar y recomendar candidatos a becas públicas (convocatoria MEC). No es un chatbot de uso libre: es un motor analítico estructurado que procesa criterios socioeconómicos y devuelve rankings justificados.
 
 ---
+![chat](img/chat.png)
+![mas_opciones](img/mas_opciones.png)
+![principal](principal.png)
 
 ## Arquitectura
 

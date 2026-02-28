@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
+import '../providers/query_provider.dart';
 import '../services/denodo_service.dart';
 import '../services/download_helper.dart';
 
@@ -19,16 +21,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _databases = ['BD Mec', 'BD ENUE', 'BD XXXX', 'BD XXX'];
-  var _selectedDatabase = 'BD Mec';
-  final _messages = <ChatMessage>[];
-  var _isLoading = false;
-  var _loadingPhase = '';
-  var _showOptions = false;
-  var _selectedModel = 'Turbo';
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
-  final _models = ['Turbo', 'Pro'];
 
   @override
   void dispose() {
@@ -37,39 +31,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _sendMessage([String? overrideText]) async {
-    final text = overrideText ?? _inputController.text.trim();
-    if (text.isEmpty || _isLoading) return;
-
-    setState(() {
-      _messages.add(ChatMessage(content: text, isUser: true));
-      _isLoading = true;
-      _loadingPhase = 'Analizando consulta...';
-      _showOptions = false;
-      if (overrideText == null) _inputController.clear();
-    });
-
+  Future<void> _send(QueryProvider provider, [String? override]) async {
+    final text = override ?? _inputController.text;
+    if (override == null) _inputController.clear();
+    await provider.sendMessage(text);
     _scrollToBottom();
-
-    final wantsPlot = RegExp(r'gr[aá]fic|plot|chart|diagrama', caseSensitive: false)
-        .hasMatch(text);
-
-    setState(() => _loadingPhase = 'Consultando base de datos...');
-
-    final response = await DenodoService.query(
-      question: text,
-      databaseNames: _selectedDatabase,
-      plot: wantsPlot,
-    );
-
-    if (mounted) {
-      setState(() {
-        _messages.add(ChatMessage.fromApiResponse(response));
-        _isLoading = false;
-        _loadingPhase = '';
-      });
-      _scrollToBottom();
-    }
   }
 
   void _scrollToBottom() {
@@ -84,30 +50,35 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _selectDatabase(String db) {
-    setState(() {
-      _selectedDatabase = db;
-      _messages.clear();
-      _showOptions = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _kBgColor,
-      body: Row(
-        children: [
-          _buildSidebar(),
-          Expanded(child: _buildMainContent()),
-        ],
+    return Consumer<QueryProvider>(
+      builder: (context, provider, _) => Scaffold(
+        backgroundColor: _kBgColor,
+        body: Row(
+          children: [
+            _Sidebar(provider: provider),
+            Expanded(child: _MainContent(
+              provider: provider,
+              inputController: _inputController,
+              scrollController: _scrollController,
+              onSend: (text) => _send(provider, text),
+            )),
+          ],
+        ),
       ),
     );
   }
+}
 
-  // ── Sidebar ──────────────────────────────────────────────────────────────
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 
-  Widget _buildSidebar() {
+class _Sidebar extends StatelessWidget {
+  const _Sidebar({required this.provider});
+  final QueryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: _kSidebarWidth,
       color: _kSidebarColor,
@@ -117,8 +88,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.only(top: 20),
-              itemCount: _databases.length,
-              separatorBuilder: (_, i) => Divider(
+              itemCount: provider.databases.length,
+              separatorBuilder: (context, index) => const Divider(
                 color: _kSidebarDividerColor,
                 height: 1,
                 thickness: 1,
@@ -126,15 +97,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 endIndent: 16,
               ),
               itemBuilder: (context, index) {
-                final db = _databases[index];
-                final isSelected = db == _selectedDatabase;
+                final db = provider.databases[index];
+                final isSelected = db == provider.selectedDatabase;
                 return InkWell(
-                  onTap: () => _selectDatabase(db),
+                  onTap: () => provider.selectDatabase(db),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
+                        horizontal: 16, vertical: 14),
                     color: isSelected
                         ? Colors.black.withValues(alpha: 0.12)
                         : Colors.transparent,
@@ -153,13 +122,12 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
-          Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
+          const Divider(color: _kSidebarDividerColor, height: 1, thickness: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(
               children: [
-                const Icon(Icons.account_circle,
-                    color: Colors.white, size: 30),
+                const Icon(Icons.account_circle, color: Colors.white, size: 30),
                 const SizedBox(width: 8),
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
@@ -181,23 +149,42 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
 
-  // ── Main content ─────────────────────────────────────────────────────────
+// ── Main content ──────────────────────────────────────────────────────────────
 
-  Widget _buildMainContent() {
-    if (_messages.isEmpty) {
+class _MainContent extends StatelessWidget {
+  const _MainContent({
+    required this.provider,
+    required this.inputController,
+    required this.scrollController,
+    required this.onSend,
+  });
+
+  final QueryProvider provider;
+  final TextEditingController inputController;
+  final ScrollController scrollController;
+  final void Function(String?) onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    if (provider.messages.isEmpty) {
       return Column(
         children: [
-          _buildHeader(),
+          const _Header(),
           Expanded(
             child: Column(
               children: [
                 const Spacer(flex: 2),
-                _buildWelcome(),
+                const _WelcomeText(),
                 const SizedBox(height: 128),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildInputBarContent(),
+                  child: _InputBar(
+                    provider: provider,
+                    controller: inputController,
+                    onSend: onSend,
+                  ),
                 ),
                 const Spacer(flex: 2),
               ],
@@ -206,16 +193,33 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       );
     }
+
     return Column(
       children: [
-        _buildHeader(),
-        Expanded(child: _buildChat()),
-        _buildInputBar(),
+        const _Header(),
+        Expanded(
+          child: _ChatArea(
+            provider: provider,
+            scrollController: scrollController,
+            onSend: onSend,
+          ),
+        ),
+        _InputBar(
+          provider: provider,
+          controller: inputController,
+          onSend: onSend,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        ),
       ],
     );
   }
+}
 
-  Widget _buildHeader() {
+class _Header extends StatelessWidget {
+  const _Header();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -233,122 +237,161 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
 
-  // ── Welcome view ─────────────────────────────────────────────────────────
+class _WelcomeText extends StatelessWidget {
+  const _WelcomeText();
 
-  Widget _buildWelcome() {
-    return Center(
-      child: Text(
-        'En que te ayudamos hoy?',
-        style: const TextStyle(
-          fontSize: 42,
-          fontWeight: FontWeight.w400,
-          color: _kAccentColor,
-        ),
-        textAlign: TextAlign.center,
+  @override
+  Widget build(BuildContext context) {
+    return const Text(
+      '¿En qué te ayudamos hoy?',
+      style: TextStyle(
+        fontSize: 42,
+        fontWeight: FontWeight.w400,
+        color: _kAccentColor,
       ),
+      textAlign: TextAlign.center,
     );
   }
+}
 
-  // ── Chat view ─────────────────────────────────────────────────────────────
+// ── Chat area ─────────────────────────────────────────────────────────────────
 
-  Widget _buildChat() {
+class _ChatArea extends StatelessWidget {
+  const _ChatArea({
+    required this.provider,
+    required this.scrollController,
+    required this.onSend,
+  });
+
+  final QueryProvider provider;
+  final ScrollController scrollController;
+  final void Function(String?) onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    final itemCount =
+        provider.messages.length + (provider.isLoading ? 1 : 0);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: ListView.builder(
-            controller: _scrollController,
+            controller: scrollController,
             padding: const EdgeInsets.all(20),
-            itemCount: _messages.length + (_isLoading ? 1 : 0),
+            itemCount: itemCount,
             itemBuilder: (context, index) {
-              if (index == _messages.length) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Column(
-                    children: [
-                      const CircularProgressIndicator(color: _kAccentColor),
-                      if (_loadingPhase.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          _loadingPhase,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF999999),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                );
+              if (index == provider.messages.length) {
+                return _LoadingIndicator(phase: provider.loadingPhase);
               }
-              final msg = _messages[index];
-              final isLastAssistant =
-                  !msg.isUser && index == _messages.length - 1 && !_isLoading;
-              return _buildMessage(msg, isLastAssistant);
+              final msg = provider.messages[index];
+              final isLastAssistant = !msg.isUser &&
+                  index == provider.messages.length - 1 &&
+                  !provider.isLoading;
+              return _MessageBubble(
+                message: msg,
+                showExtras: isLastAssistant,
+                provider: provider,
+                onSend: onSend,
+              );
             },
           ),
         ),
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          width: _showOptions ? 160.0 : 0.0,
-          child: _showOptions ? _buildOptionsPanel() : const SizedBox.shrink(),
+          width: provider.showOptions ? 160.0 : 0.0,
+          child: provider.showOptions
+              ? _OptionsPanel(provider: provider)
+              : const SizedBox.shrink(),
         ),
       ],
     );
   }
+}
 
-  Widget _buildMessage(ChatMessage msg, bool showExtras) {
-    if (msg.isUser) {
+class _LoadingIndicator extends StatelessWidget {
+  const _LoadingIndicator({required this.phase});
+  final String phase;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        children: [
+          const CircularProgressIndicator(color: _kAccentColor),
+          if (phase.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              phase,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF999999)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Message bubble ────────────────────────────────────────────────────────────
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({
+    required this.message,
+    required this.showExtras,
+    required this.provider,
+    required this.onSend,
+  });
+
+  final ChatMessage message;
+  final bool showExtras;
+  final QueryProvider provider;
+  final void Function(String?) onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    if (message.isUser) {
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
           margin: const EdgeInsets.only(bottom: 16, left: 80),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFFE0E0E0),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            msg.content,
-            style: const TextStyle(
-                fontSize: 18, color: Color(0xFF333333)),
+            message.content,
+            style: const TextStyle(fontSize: 18, color: Color(0xFF333333)),
           ),
         ),
       );
     }
 
-    final api = msg.apiResponse;
-
+    final api = message.apiResponse;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Respuesta de texto
           SelectableText(
-            msg.content,
+            message.content,
             style: const TextStyle(
               fontSize: 18,
               color: Color(0xFF333333),
               height: 1.6,
             ),
           ),
-
-          // Razonamiento (SQL + explicacion)
           if (api?.sqlQuery != null || api?.queryExplanation != null) ...[
             const SizedBox(height: 12),
-            _buildReasoning(api!),
+            _ReasoningTile(api: api!),
           ],
-
-          // Grafica SVG
           if (api?.rawGraph != null) ...[
             const SizedBox(height: 12),
-            _buildGraph(api!.rawGraph!),
+            _GraphCard(dataUri: api!.rawGraph!),
           ],
-
-          // Preguntas relacionadas
           if (showExtras && api != null && api.relatedQuestions.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text(
@@ -360,48 +403,63 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            ...api.relatedQuestions.map((q) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: InkWell(
-                    onTap: () => _sendMessage(q),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFDDDDDD)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        q,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: _kAccentColor,
-                        ),
-                      ),
-                    ),
-                  ),
+            ...api.relatedQuestions.map((q) => _RelatedQuestion(
+                  question: q,
+                  onTap: () => onSend(q),
                 )),
           ],
-
-          // Boton de opciones
           if (showExtras)
             Align(
               alignment: Alignment.centerRight,
               child: IconButton(
-                tooltip: 'Mas opciones',
+                tooltip: 'Más opciones',
                 icon: const Icon(Icons.more_horiz, size: 22),
                 color: const Color(0xFF777777),
-                onPressed: () =>
-                    setState(() => _showOptions = !_showOptions),
+                onPressed: provider.toggleOptions,
               ),
             ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildReasoning(ApiResponse api) {
+class _RelatedQuestion extends StatelessWidget {
+  const _RelatedQuestion({required this.question, required this.onTap});
+  final String question;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFDDDDDD)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            question,
+            style: const TextStyle(fontSize: 13, color: _kAccentColor),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Reasoning tile ────────────────────────────────────────────────────────────
+
+class _ReasoningTile extends StatelessWidget {
+  const _ReasoningTile({required this.api});
+  final ApiResponse api;
+
+  @override
+  Widget build(BuildContext context) {
     return ExpansionTile(
       tilePadding: const EdgeInsets.symmetric(horizontal: 12),
       childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -415,17 +473,17 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       backgroundColor: Colors.white,
       collapsedBackgroundColor: Colors.white,
+      leading: const Icon(Icons.psychology, size: 20, color: Color(0xFF555555)),
       title: const Text(
         'Ver razonamiento',
         style: TextStyle(fontSize: 13, color: Color(0xFF555555)),
       ),
-      leading: const Icon(Icons.psychology, size: 20, color: Color(0xFF555555)),
       children: [
         if (api.queryExplanation != null) ...[
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Explicacion:',
+              'Explicación:',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -436,7 +494,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 4),
           SelectableText(
             api.queryExplanation!,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF666666), height: 1.5),
+            style: const TextStyle(
+                fontSize: 12, color: Color(0xFF666666), height: 1.5),
           ),
         ],
         if (api.sqlQuery != null) ...[
@@ -444,7 +503,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Consulta SQL:',
+              'Consulta VQL:',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -476,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Tablas usadas: ${api.tablesUsed.join(", ")}',
+              'Vistas usadas: ${api.tablesUsed.join(", ")}',
               style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
             ),
           ),
@@ -484,12 +543,18 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
+}
 
-  Widget _buildGraph(String dataUri) {
-    // El raw_graph viene como "data:image/svg+xml;base64,..."
+// ── Graph card ────────────────────────────────────────────────────────────────
+
+class _GraphCard extends StatelessWidget {
+  const _GraphCard({required this.dataUri});
+  final String dataUri;
+
+  @override
+  Widget build(BuildContext context) {
     try {
-      final base64Str = dataUri.split(',').last;
-      final svgString = utf8.decode(base64Decode(base64Str));
+      final svgString = utf8.decode(base64Decode(dataUri.split(',').last));
       return Container(
         constraints: const BoxConstraints(maxHeight: 350),
         decoration: BoxDecoration(
@@ -500,21 +565,18 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.all(8),
         child: Stack(
           children: [
-            SvgPicture.string(
-              svgString,
-              fit: BoxFit.contain,
-            ),
+            SvgPicture.string(svgString, fit: BoxFit.contain),
             Positioned(
               top: 4,
               right: 4,
               child: IconButton(
-                tooltip: 'Descargar grafica',
+                tooltip: 'Descargar gráfica',
                 icon: const Icon(Icons.download, size: 20),
                 color: const Color(0xFF555555),
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.white.withValues(alpha: 0.85),
                 ),
-                onPressed: () => _saveGraph(svgString),
+                onPressed: () => _saveGraph(context, svgString),
               ),
             ),
           ],
@@ -525,19 +587,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _saveGraph(String svgContent) async {
+  Future<void> _saveGraph(BuildContext context, String svgContent) async {
     try {
       final path = await saveSvgFile(svgContent);
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Grafica guardada: $path'),
+            content: Text('Gráfica guardada: $path'),
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al guardar: $e'),
@@ -547,10 +609,16 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
+}
 
-  // ── Options panel ─────────────────────────────────────────────────────────
+// ── Options panel ─────────────────────────────────────────────────────────────
 
-  Widget _buildOptionsPanel() {
+class _OptionsPanel extends StatelessWidget {
+  const _OptionsPanel({required this.provider});
+  final QueryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -559,23 +627,43 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildOptionItem(Icons.download_outlined, 'Exportar', () {}),
+          _OptionItem(
+            icon: Icons.download_outlined,
+            label: 'Exportar',
+            onTap: () {},
+          ),
           const Divider(height: 1),
-          _buildOptionItem(Icons.share_outlined, 'Compartir', () {}),
+          _OptionItem(
+            icon: Icons.share_outlined,
+            label: 'Compartir',
+            onTap: () {},
+          ),
           const Spacer(),
           const Divider(height: 1),
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_up),
             color: const Color(0xFF555555),
             tooltip: 'Cerrar',
-            onPressed: () => setState(() => _showOptions = false),
+            onPressed: provider.hideOptions,
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildOptionItem(IconData icon, String label, VoidCallback onTap) {
+class _OptionItem extends StatelessWidget {
+  const _OptionItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -592,19 +680,26 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
 
-  // ── Input bar ─────────────────────────────────────────────────────────────
+// ── Input bar ─────────────────────────────────────────────────────────────────
 
-  Widget _buildInputBar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      color: _kBgColor,
-      child: _buildInputBarContent(),
-    );
-  }
+class _InputBar extends StatelessWidget {
+  const _InputBar({
+    required this.provider,
+    required this.controller,
+    required this.onSend,
+    this.padding,
+  });
 
-  Widget _buildInputBarContent() {
-    return Container(
+  final QueryProvider provider;
+  final TextEditingController controller;
+  final void Function(String?) onSend;
+  final EdgeInsets? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget content = Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -613,11 +708,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         children: [
           const SizedBox(width: 10),
-          _buildModelDropdown(),
+          _ModelDropdown(provider: provider),
           const SizedBox(width: 16),
           Expanded(
             child: TextField(
-              controller: _inputController,
+              controller: controller,
               decoration: const InputDecoration(
                 hintText: 'Escriba la consulta',
                 hintStyle:
@@ -626,7 +721,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 contentPadding: EdgeInsets.symmetric(vertical: 20),
               ),
               style: const TextStyle(fontSize: 18),
-              onSubmitted: (_) => _sendMessage(),
+              onSubmitted: (_) => onSend(null),
               textInputAction: TextInputAction.send,
             ),
           ),
@@ -636,23 +731,39 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.send_rounded, size: 26),
               color: _kAccentColor,
               tooltip: 'Enviar',
-              onPressed: _isLoading ? null : () => _sendMessage(),
+              onPressed: provider.isLoading ? null : () => onSend(null),
             ),
           ),
         ],
       ),
     );
-  }
 
-  Widget _buildModelDropdown() {
+    if (padding != null) {
+      content = Container(
+        padding: padding,
+        color: _kBgColor,
+        child: content,
+      );
+    }
+
+    return content;
+  }
+}
+
+class _ModelDropdown extends StatelessWidget {
+  const _ModelDropdown({required this.provider});
+  final QueryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      initialValue: _selectedModel,
-      onSelected: (v) => setState(() => _selectedModel = v),
+      initialValue: provider.selectedModel,
+      onSelected: provider.selectModel,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 4,
       color: const Color(0xFF333333),
-      itemBuilder: (context) => _models.map((m) {
-        final isSelected = m == _selectedModel;
+      itemBuilder: (context) => provider.models.map((m) {
+        final isSelected = m == provider.selectedModel;
         return PopupMenuItem<String>(
           value: m,
           child: Row(
@@ -686,12 +797,11 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _selectedModel,
+              provider.selectedModel,
               style: const TextStyle(fontSize: 16, color: _kBgColor),
             ),
             const SizedBox(width: 4),
-            const Icon(Icons.keyboard_arrow_down,
-                size: 18, color: _kBgColor),
+            const Icon(Icons.keyboard_arrow_down, size: 18, color: _kBgColor),
           ],
         ),
       ),

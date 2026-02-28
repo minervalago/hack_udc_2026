@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'providers/query_provider.dart';
 import 'screens/home_screen.dart';
 
 void main() {
@@ -10,17 +12,20 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Administrador de Becas',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD96E6E),
-          brightness: Brightness.light,
+    return ChangeNotifierProvider(
+      create: (_) => QueryProvider(),
+      child: MaterialApp(
+        title: 'Administrador de Becas',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFD96E6E),
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
         ),
-        useMaterial3: true,
+        home: const HomeScreen(),
       ),
-      home: const HomeScreen(),
     );
   }
 }

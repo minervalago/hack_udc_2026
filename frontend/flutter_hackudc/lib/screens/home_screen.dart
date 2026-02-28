@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 // ignore: depend_on_referenced_packages
@@ -1560,7 +1561,7 @@ class _OptionItem extends StatelessWidget {
 
 // ── Input bar ─────────────────────────────────────────────────────────────────
 
-class _InputBar extends StatelessWidget {
+class _InputBar extends StatefulWidget {
   const _InputBar({
     required this.provider,
     required this.controller,
@@ -1574,6 +1575,78 @@ class _InputBar extends StatelessWidget {
   final EdgeInsets? padding;
 
   @override
+  State<_InputBar> createState() => _InputBarState();
+}
+
+class _InputBarState extends State<_InputBar> {
+  final _focusNode = FocusNode();
+  int _historyIndex = -1;
+  bool _navigating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTextChanged);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onTextChanged() {
+    if (!_navigating && _historyIndex != -1) {
+      setState(() => _historyIndex = -1);
+    }
+  }
+
+  List<String> get _sentMessages => widget.provider.messages
+      .where((m) => m.isUser)
+      .map((m) => m.content)
+      .toList();
+
+  bool _handleKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final key = event.logicalKey;
+    if (key != LogicalKeyboardKey.arrowUp &&
+        key != LogicalKeyboardKey.arrowDown) {
+      return false;
+    }
+
+    final history = _sentMessages;
+    if (history.isEmpty) return false;
+    if (widget.controller.text.isNotEmpty && _historyIndex == -1) return false;
+
+    if (key == LogicalKeyboardKey.arrowUp) {
+      final newIndex = (_historyIndex + 1).clamp(0, history.length - 1);
+      _navigating = true;
+      setState(() => _historyIndex = newIndex);
+      widget.controller.text = history[history.length - 1 - newIndex];
+      widget.controller.selection =
+          TextSelection.collapsed(offset: widget.controller.text.length);
+      _navigating = false;
+    } else {
+      if (_historyIndex <= 0) {
+        _navigating = true;
+        setState(() => _historyIndex = -1);
+        widget.controller.clear();
+        _navigating = false;
+      } else {
+        final newIndex = _historyIndex - 1;
+        _navigating = true;
+        setState(() => _historyIndex = newIndex);
+        widget.controller.text = history[history.length - 1 - newIndex];
+        widget.controller.selection =
+            TextSelection.collapsed(offset: widget.controller.text.length);
+        _navigating = false;
+      }
+    }
+    return true;
+  }
+
+  @override
   Widget build(BuildContext context) {
     Widget content = Container(
       decoration: BoxDecoration(
@@ -1584,21 +1657,26 @@ class _InputBar extends StatelessWidget {
       child: Row(
         children: [
           const SizedBox(width: 10),
-          _ModelDropdown(provider: provider),
+          _ModelDropdown(provider: widget.provider),
           const SizedBox(width: 16),
           Expanded(
-            child: TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                hintText: 'Escriba la consulta',
-                hintStyle:
-                    TextStyle(color: Color(0xFFAAAAAA), fontSize: 20),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 20),
+            child: KeyboardListener(
+              focusNode: FocusNode(),
+              onKeyEvent: _handleKey,
+              child: TextField(
+                controller: widget.controller,
+                focusNode: _focusNode,
+                decoration: const InputDecoration(
+                  hintText: 'Escriba la consulta',
+                  hintStyle:
+                      TextStyle(color: Color(0xFFAAAAAA), fontSize: 20),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 20),
+                ),
+                style: const TextStyle(fontSize: 18),
+                onSubmitted: (_) => widget.onSend(null),
+                textInputAction: TextInputAction.send,
               ),
-              style: const TextStyle(fontSize: 18),
-              onSubmitted: (_) => onSend(null),
-              textInputAction: TextInputAction.send,
             ),
           ),
           Padding(
@@ -1607,16 +1685,17 @@ class _InputBar extends StatelessWidget {
               icon: const Icon(Icons.send_rounded, size: 26),
               color: _kAccentColor,
               tooltip: 'Enviar',
-              onPressed: provider.isLoading ? null : () => onSend(null),
+              onPressed:
+                  widget.provider.isLoading ? null : () => widget.onSend(null),
             ),
           ),
         ],
       ),
     );
 
-    if (padding != null) {
+    if (widget.padding != null) {
       content = Container(
-        padding: padding,
+        padding: widget.padding,
         color: _kBgColor,
         child: content,
       );

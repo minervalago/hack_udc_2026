@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class EmailService {
-  static const _apiKey = 're_PfJxugab_J5YuMURvfmxiLaigv1h4duLY';
+  static const _apiKey = 're_3g1CGkAS_5U5sfmir7ojMnT3xrpPji2Qm';
   static const _from = 'onboarding@resend.dev';
 
   static Future<void> sendReport({

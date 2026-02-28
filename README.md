@@ -75,8 +75,9 @@ flutter pub get
 El SDK debe estar corriendo en `localhost:8008` con las vistas de Denodo Express sincronizadas. Credenciales por defecto: `admin / admin`.
 
 Vistas de datos requeridas:
-- `solicitudes_beca_mec`
-- `umbrales_renta_mec`
+- `datos_personales`
+- `dato_socioeconomicos`
+- `dato_becas`
 
 ---
 
@@ -87,7 +88,7 @@ cd flutter_hackudc
 flutter run -d chrome
 ```
 
-> La app **solo funciona en Chrome**. El inicio de sesión con Google usa `signInWithPopup`, que es exclusivo de Flutter Web.
+> El inicio de sesión con Google usa `signInWithPopup`, que es exclusivo de Flutter Web.
 
 ---
 

@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+// ignore: depend_on_referenced_packages
+import 'package:markdown/markdown.dart' as md;
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../models/chat_session.dart';
@@ -786,19 +788,10 @@ class _MessageBubble extends StatelessWidget {
 
 // Converts markdown to a styled, print-ready HTML page for Turbo PDF export.
 String _buildPdfHtml(String markdown) {
-  var body = markdown
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;');
-  body = body.replaceAllMapped(RegExp(r'^### (.+)$', multiLine: true),
-      (m) => '<h3>${m[1]}</h3>');
-  body = body.replaceAllMapped(RegExp(r'^## (.+)$', multiLine: true),
-      (m) => '<h2>${m[1]}</h2>');
-  body = body.replaceAllMapped(RegExp(r'^# (.+)$', multiLine: true),
-      (m) => '<h1>${m[1]}</h1>');
-  body = body.replaceAllMapped(
-      RegExp(r'\*\*([^*]+)\*\*'), (m) => '<strong>${m[1]}</strong>');
-  body = body.replaceAll('\n', '<br>\n');
+  final htmlBody = md.markdownToHtml(
+    markdown,
+    extensionSet: md.ExtensionSet.gitHubWeb,
+  );
   return '''<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -806,15 +799,25 @@ String _buildPdfHtml(String markdown) {
   <title>Informe — Administrador de Becas</title>
   <style>
     body{font-family:Arial,sans-serif;font-size:14px;line-height:1.7;margin:40px;color:#333}
-    h1{font-size:22px;color:#D96E6E;border-bottom:2px solid #D96E6E;padding-bottom:6px}
-    h2{font-size:18px;color:#D96E6E}
-    h3{font-size:15px;color:#555}
+    h1{font-size:22px;color:#D96E6E;border-bottom:2px solid #D96E6E;padding-bottom:6px;margin-top:24px}
+    h2{font-size:18px;color:#D96E6E;margin-top:20px}
+    h3{font-size:15px;color:#555;margin-top:16px}
     strong{font-weight:bold}
+    table{border-collapse:collapse;width:100%;margin:16px 0}
+    th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}
+    th{background:#f5f5f5;font-weight:bold}
+    code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:13px}
+    pre{background:#2d2d2d;color:#66ff66;padding:12px;border-radius:6px;overflow-x:auto}
+    pre code{background:none;color:inherit;padding:0}
+    ul,ol{margin:8px 0;padding-left:24px}
+    li{margin:4px 0}
+    blockquote{border-left:4px solid #D96E6E;margin:16px 0;padding:8px 16px;color:#555;background:#fdf5f5}
+    hr{border:none;border-top:1px solid #ddd;margin:20px 0}
   </style>
   <script>window.onload=function(){window.print();}</script>
 </head>
 <body>
-$body
+$htmlBody
 </body>
 </html>''';
 }

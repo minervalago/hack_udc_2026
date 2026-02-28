@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class EmailService {
   // Replace with your Resend API key from https://resend.com
-  static const _apiKey = 'RESEND_API_KEY_HERE';
+  static const _apiKey = 're_PfJxugab_J5YuMURvfmxiLaigv1h4duLY';
   // Resend sandbox sender — works without domain verification
   static const _from = 'onboarding@resend.dev';
 

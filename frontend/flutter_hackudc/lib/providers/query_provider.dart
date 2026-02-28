@@ -1,7 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/chat_message.dart';
 import '../models/chat_session.dart';
 import '../services/denodo_service.dart';
+import '../services/email_service.dart';
 import '../services/firestore_service.dart';
 
 enum QueryStatus { idle, loading, done, error }
@@ -18,6 +20,11 @@ class QueryProvider extends ChangeNotifier {
   bool showOptions = false;
   bool loadingDatabases = false;
   String? databasesError;
+
+  // Email state for Deep mode auto-send
+  bool emailSending = false;
+  String? emailSentTo;
+  String? emailError;
 
   final List<String> models = ['Turbo', 'Deep'];
   List<String> databases = [];
@@ -144,6 +151,9 @@ class QueryProvider extends ChangeNotifier {
     status = QueryStatus.loading;
     loadingPhase = 'Iniciando consulta...';
     showOptions = false;
+    emailSending = false;
+    emailSentTo = null;
+    emailError = null;
     notifyListeners();
 
     final wantsPlot = RegExp(
@@ -169,6 +179,27 @@ class QueryProvider extends ChangeNotifier {
 
     if (_userId != null) {
       FirestoreService.saveSession(_userId!, _currentSession!).ignore();
+    }
+
+    // Auto-send Deep report by email
+    if (selectedModel == 'Deep' && response.htmlReport != null) {
+      final userEmail = FirebaseAuth.instance.currentUser?.email;
+      if (userEmail != null && userEmail.isNotEmpty) {
+        emailSending = true;
+        notifyListeners();
+        EmailService.sendDeepReport(
+          toEmail: userEmail,
+          htmlContent: response.htmlReport!,
+        ).then((_) {
+          emailSentTo = userEmail;
+          emailSending = false;
+          notifyListeners();
+        }).catchError((e) {
+          emailError = e.toString().replaceFirst('Exception: ', '');
+          emailSending = false;
+          notifyListeners();
+        });
+      }
     }
   }
 }

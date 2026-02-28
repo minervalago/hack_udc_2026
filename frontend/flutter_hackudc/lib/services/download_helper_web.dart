@@ -26,6 +26,28 @@ Future<String> saveHtmlFile(String htmlContent) async {
   return 'informe_$timestamp.html';
 }
 
+Future<void> printAsPdf(String htmlContent) async {
+  // Inject auto-print script if not already present, then open in new tab.
+  // The browser print dialog lets the user save as PDF.
+  String printable = htmlContent;
+  if (!htmlContent.contains('window.print')) {
+    printable = htmlContent.replaceFirst(
+      '</body>',
+      '<script>window.onload=function(){window.print();}</script></body>',
+    );
+    if (!printable.contains('window.print')) {
+      // Fallback: append before closing html tag or just append
+      printable = '$printable<script>window.onload=function(){window.print();}</script>';
+    }
+  }
+  final bytes = utf8.encode(printable);
+  final blob = html.Blob([bytes], 'text/html');
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  html.window.open(url, '_blank');
+  // Delay revoke so the new window has time to load the blob
+  Future.delayed(const Duration(seconds: 10), () => html.Url.revokeObjectUrl(url));
+}
+
 void openEmailCompose(String toEmail, String subject) {
   final uri = 'mailto:$toEmail?subject=${Uri.encodeComponent(subject)}';
   html.window.open(uri, '_self');

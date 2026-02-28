@@ -764,8 +764,10 @@ class _MessageBubble extends StatelessWidget {
                   onTap: () => onSend(q),
                 )),
           ],
+          if (showExtras && !message.isUser && api?.htmlReport == null)
+            _PdfDownloadButton(markdownContent: message.content),
           if (showExtras && api?.htmlReport != null)
-            _ReportActions(htmlReport: api!.htmlReport!),
+            _ReportActions(htmlReport: api!.htmlReport!, provider: provider),
           if (showExtras)
             Align(
               alignment: Alignment.centerRight,
@@ -782,59 +784,172 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-class _ReportActions extends StatelessWidget {
-  const _ReportActions({required this.htmlReport});
-  final String htmlReport;
+// Converts markdown to a styled, print-ready HTML page for Turbo PDF export.
+String _buildPdfHtml(String markdown) {
+  var body = markdown
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
+  body = body.replaceAllMapped(RegExp(r'^### (.+)$', multiLine: true),
+      (m) => '<h3>${m[1]}</h3>');
+  body = body.replaceAllMapped(RegExp(r'^## (.+)$', multiLine: true),
+      (m) => '<h2>${m[1]}</h2>');
+  body = body.replaceAllMapped(RegExp(r'^# (.+)$', multiLine: true),
+      (m) => '<h1>${m[1]}</h1>');
+  body = body.replaceAllMapped(
+      RegExp(r'\*\*([^*]+)\*\*'), (m) => '<strong>${m[1]}</strong>');
+  body = body.replaceAll('\n', '<br>\n');
+  return '''<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Informe — Administrador de Becas</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:14px;line-height:1.7;margin:40px;color:#333}
+    h1{font-size:22px;color:#D96E6E;border-bottom:2px solid #D96E6E;padding-bottom:6px}
+    h2{font-size:18px;color:#D96E6E}
+    h3{font-size:15px;color:#555}
+    strong{font-weight:bold}
+  </style>
+  <script>window.onload=function(){window.print();}</script>
+</head>
+<body>
+$body
+</body>
+</html>''';
+}
+
+class _PdfDownloadButton extends StatelessWidget {
+  const _PdfDownloadButton({required this.markdownContent});
+  final String markdownContent;
 
   @override
   Widget build(BuildContext context) {
-    final userEmail = FirebaseAuth.instance.currentUser?.email ?? '';
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Row(
-        children: [
-          _ReportButton(
-            icon: Icons.download_outlined,
-            label: 'Descargar informe',
-            onTap: () => _download(context),
-          ),
-          const SizedBox(width: 10),
-          _ReportButton(
-            icon: Icons.email_outlined,
-            label: 'Enviar por correo',
-            onTap: () => _email(context, userEmail),
-          ),
-        ],
+      padding: const EdgeInsets.only(top: 12),
+      child: _ReportButton(
+        icon: Icons.picture_as_pdf_outlined,
+        label: 'Descargar PDF',
+        onTap: () => _download(context),
       ),
     );
   }
 
   Future<void> _download(BuildContext context) async {
     try {
-      final path = await saveHtmlFile(htmlReport);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Informe guardado: $path'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      await printAsPdf(_buildPdfHtml(markdownContent));
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al guardar el informe: $e'),
+            content: Text('Error al generar el PDF: $e'),
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
     }
   }
+}
 
-  Future<void> _email(BuildContext context, String toEmail) async {
-    await _download(context);
-    openEmailCompose(toEmail, 'Informe Deep Query — Administrador de Becas');
+class _ReportActions extends StatelessWidget {
+  const _ReportActions({required this.htmlReport, required this.provider});
+  final String htmlReport;
+  final QueryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _ReportButton(
+                icon: Icons.picture_as_pdf_outlined,
+                label: 'Descargar PDF',
+                onTap: () => _downloadPdf(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _EmailStatus(provider: provider),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _downloadPdf(BuildContext context) async {
+    try {
+      await printAsPdf(htmlReport);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al generar el PDF: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+}
+
+class _EmailStatus extends StatelessWidget {
+  const _EmailStatus({required this.provider});
+  final QueryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    if (provider.emailSending) {
+      return const Row(
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              color: _kAccentColor,
+              strokeWidth: 2,
+            ),
+          ),
+          SizedBox(width: 8),
+          Text(
+            'Enviando informe por correo...',
+            style: TextStyle(fontSize: 13, color: Color(0xFF777777)),
+          ),
+        ],
+      );
+    }
+    if (provider.emailSentTo != null) {
+      return Row(
+        children: [
+          const Icon(Icons.check_circle_outline,
+              size: 16, color: Color(0xFF4CAF50)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Informe enviado a ${provider.emailSentTo}',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF4CAF50)),
+            ),
+          ),
+        ],
+      );
+    }
+    if (provider.emailError != null) {
+      return Row(
+        children: [
+          const Icon(Icons.error_outline, size: 16, color: Colors.redAccent),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'No se pudo enviar el correo: ${provider.emailError}',
+              style: const TextStyle(fontSize: 13, color: Colors.redAccent),
+            ),
+          ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
   }
 }
 

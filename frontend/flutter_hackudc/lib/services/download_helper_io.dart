@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter_html_to_pdf/flutter_html_to_pdf.dart';
 
 Future<String> saveSvgFile(String svgContent) async {
   final home = Platform.environment['HOME'] ?? '/tmp';
@@ -16,6 +17,17 @@ Future<String> saveHtmlFile(String htmlContent) async {
   final file = File('$dir/informe_$timestamp.html');
   await file.writeAsString(htmlContent);
   return file.path;
+}
+
+Future<void> printAsPdf(String htmlContent) async {
+  final home = Platform.environment['HOME'] ?? '/tmp';
+  final dir = _downloadsDir(home);
+  final timestamp = DateTime.now().millisecondsSinceEpoch;
+  await FlutterHtmlToPdf.convertFromHtmlContent(
+    htmlContent,
+    dir,
+    'informe_$timestamp',
+  );
 }
 
 void openEmailCompose(String toEmail, String subject) {}

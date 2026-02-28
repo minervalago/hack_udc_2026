@@ -6,7 +6,7 @@ class EmailService {
   // EmailJS supports CORS from browser (unlike Resend)
   static const _publicKey = 'rfMF8zTzoGDbNhd0E';
   static const _serviceId = 'service_qd0ms1y';
-  static const _templateId = 'h7jvbxs';
+  static const _templateId = 'template_c7s5hbh';
 
   static Future<void> sendDeepReport({
     required String toEmail,

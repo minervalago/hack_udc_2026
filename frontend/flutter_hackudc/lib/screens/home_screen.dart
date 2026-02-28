@@ -12,6 +12,7 @@ import '../providers/query_provider.dart';
 import '../services/auth_service.dart';
 import '../services/denodo_service.dart';
 import '../services/download_helper.dart';
+import '../services/email_service.dart';
 
 const _kSidebarWidth = 220.0;
 const _kSidebarColor = Color(0xFFD96E6E);
@@ -766,10 +767,10 @@ class _MessageBubble extends StatelessWidget {
                   onTap: () => onSend(q),
                 )),
           ],
-          if (showExtras && !message.isUser && api?.htmlReport == null)
-            _PdfDownloadButton(markdownContent: message.content),
-          if (showExtras && api?.htmlReport != null)
-            _ReportActions(htmlReport: api!.htmlReport!, provider: provider),
+          if (showExtras && !message.isUser)
+            _ActionButtons(
+              htmlContent: api?.htmlReport ?? _buildPdfHtml(message.content),
+            ),
           if (showExtras)
             Align(
               alignment: Alignment.centerRight,
@@ -822,61 +823,23 @@ $htmlBody
 </html>''';
 }
 
-class _PdfDownloadButton extends StatelessWidget {
-  const _PdfDownloadButton({required this.markdownContent});
-  final String markdownContent;
+class _ActionButtons extends StatelessWidget {
+  const _ActionButtons({required this.htmlContent});
+  final String htmlContent;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: _ReportButton(
-        icon: Icons.picture_as_pdf_outlined,
-        label: 'Descargar PDF',
-        onTap: () => _download(context),
-      ),
-    );
-  }
-
-  Future<void> _download(BuildContext context) async {
-    try {
-      await printAsPdf(_buildPdfHtml(markdownContent));
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al generar el PDF: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-}
-
-class _ReportActions extends StatelessWidget {
-  const _ReportActions({required this.htmlReport, required this.provider});
-  final String htmlReport;
-  final QueryProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              _ReportButton(
-                icon: Icons.picture_as_pdf_outlined,
-                label: 'Descargar PDF',
-                onTap: () => _downloadPdf(context),
-              ),
-            ],
+          _ReportButton(
+            icon: Icons.picture_as_pdf_outlined,
+            label: 'Descargar PDF',
+            onTap: () => _downloadPdf(context),
           ),
-          const SizedBox(height: 8),
-          _EmailStatus(provider: provider),
+          const SizedBox(width: 10),
+          _EmailButton(htmlContent: htmlContent),
         ],
       ),
     );
@@ -884,7 +847,7 @@ class _ReportActions extends StatelessWidget {
 
   Future<void> _downloadPdf(BuildContext context) async {
     try {
-      await printAsPdf(htmlReport);
+      await printAsPdf(htmlContent);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -898,61 +861,88 @@ class _ReportActions extends StatelessWidget {
   }
 }
 
-class _EmailStatus extends StatelessWidget {
-  const _EmailStatus({required this.provider});
-  final QueryProvider provider;
+enum _EmailState { idle, sending, sent, error }
+
+class _EmailButton extends StatefulWidget {
+  const _EmailButton({required this.htmlContent});
+  final String htmlContent;
+
+  @override
+  State<_EmailButton> createState() => _EmailButtonState();
+}
+
+class _EmailButtonState extends State<_EmailButton> {
+  _EmailState _state = _EmailState.idle;
+  String? _error;
+
+  Future<void> _send() async {
+    final email = FirebaseAuth.instance.currentUser?.email;
+    if (email == null || email.isEmpty) return;
+
+    setState(() {
+      _state = _EmailState.sending;
+      _error = null;
+    });
+
+    try {
+      await EmailService.sendReport(
+        toEmail: email,
+        htmlContent: widget.htmlContent,
+      );
+      setState(() => _state = _EmailState.sent);
+    } catch (e) {
+      setState(() {
+        _state = _EmailState.error;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (provider.emailSending) {
-      return const Row(
-        children: [
-          SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(
-              color: _kAccentColor,
-              strokeWidth: 2,
+    return switch (_state) {
+      _EmailState.idle => _ReportButton(
+          icon: Icons.email_outlined,
+          label: 'Enviar por correo',
+          onTap: _send,
+        ),
+      _EmailState.sending => const Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: _kAccentColor),
             ),
-          ),
-          SizedBox(width: 8),
-          Text(
-            'Enviando informe por correo...',
-            style: TextStyle(fontSize: 13, color: Color(0xFF777777)),
-          ),
-        ],
-      );
-    }
-    if (provider.emailSentTo != null) {
-      return Row(
-        children: [
-          const Icon(Icons.check_circle_outline,
-              size: 16, color: Color(0xFF4CAF50)),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              'Informe enviado a ${provider.emailSentTo}',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF4CAF50)),
+            SizedBox(width: 8),
+            Text('Enviando...',
+                style: TextStyle(fontSize: 13, color: Color(0xFF777777))),
+          ],
+        ),
+      _EmailState.sent => const Row(
+          children: [
+            Icon(Icons.check_circle_outline,
+                size: 16, color: Color(0xFF4CAF50)),
+            SizedBox(width: 6),
+            Text('Correo enviado',
+                style: TextStyle(fontSize: 13, color: Color(0xFF4CAF50))),
+          ],
+        ),
+      _EmailState.error => Row(
+          children: [
+            const Icon(Icons.error_outline,
+                size: 16, color: Colors.redAccent),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Error: $_error',
+                style:
+                    const TextStyle(fontSize: 13, color: Colors.redAccent),
+              ),
             ),
-          ),
-        ],
-      );
-    }
-    if (provider.emailError != null) {
-      return Row(
-        children: [
-          const Icon(Icons.error_outline, size: 16, color: Colors.redAccent),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              'No se pudo enviar el correo: ${provider.emailError}',
-              style: const TextStyle(fontSize: 13, color: Colors.redAccent),
-            ),
-          ),
-        ],
-      );
-    }
-    return const SizedBox.shrink();
+          ],
+        ),
+    };
   }
 }
 

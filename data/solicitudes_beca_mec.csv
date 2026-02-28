@@ -1,0 +1,101 @@
+id_solicitud,nif_solicitante,nombre_solicitante,domicilio_familiar,municipio_domicilio,provincia_domicilio,reside_fuera_domicilio,ciudad_residencia_curso,renta_anual_familiar,num_miembros_unidad_familiar,discapacidad,orfandad,familia_numerosa,nacionalidad_espanola,repite_curso
+SOL-MEC-001,14265799A,José Pérez Morales,"Calle Real 76, 2º A",Jerez de la Frontera,Cádiz,False,Jerez de la Frontera,3966.36,1,False,False,False,False,False
+SOL-MEC-002,82556484P,María Pérez Ruiz,"Paseo del Prado 7, 3º C",Bilbao,Vizcaya,False,Bilbao,59261.47,5,False,False,False,True,False
+SOL-MEC-003,72415804M,Paula Ortega Flores,"Calle Independencia 86, Bajo",Ourense,Ourense,True,Pontevedra,14404.69,1,False,True,False,True,False
+SOL-MEC-004,93940940Q,Patricia Sánchez Morales,"Calle del Sol 80, 4º A",Córdoba,Córdoba,True,Valladolid,37415.92,4,True,False,False,True,False
+SOL-MEC-005,13885234L,Carmen Navarro Sánchez,"Paseo del Prado 57, 1º A",Lugo,Lugo,True,Valencia,24175.88,2,False,False,False,True,False
+SOL-MEC-006,70667140P,Beatriz Jiménez Muñoz,"Calle del Sol 66, 2º B",Bilbao,Vizcaya,True,Lugo,2973.24,2,False,False,False,True,False
+SOL-MEC-007,54585178Z,Nuria Ruiz Álvarez,"Rúa do Franco 4, 1º A",Vigo,Pontevedra,False,Vigo,36144.87,4,False,False,True,True,False
+SOL-MEC-008,33357554X,Rubén Gil Alonso,"Gran Vía 25, 2º A",Valencia,Valencia,True,Sevilla,10988.35,1,False,False,False,True,False
+SOL-MEC-009,87049595T,Lucía Núñez Núñez,"Calle Independencia 14, 4º A",Ourense,Ourense,True,A Coruña,10074.19,1,True,True,False,True,False
+SOL-MEC-010,77491435L,Pablo Flores Sánchez,"Avenida de la Constitución 7, 2º B",Sevilla,Sevilla,True,Valladolid,30159.97,2,False,False,False,True,False
+SOL-MEC-011,41934639G,Adrián Navarro Martínez,"Gran Vía 2, 1º B",A Coruña,A Coruña,False,A Coruña,21331.19,3,False,False,True,True,False
+SOL-MEC-012,48285503Q,Álvaro Castillo Iglesias,"Avenida de Portugal 34, 4º A",A Coruña,A Coruña,True,Oviedo,34267.22,2,False,False,False,True,False
+SOL-MEC-013,21490777Z,Miguel Ortiz Iglesias,"Avenida de Galicia 72, Bajo",Jerez de la Frontera,Cádiz,True,Pontevedra,16289.61,3,False,False,False,True,False
+SOL-MEC-014,73481353X,Nuria Reyes Rodríguez,"Calle Independencia 32, 4º A",Jerez de la Frontera,Cádiz,False,Jerez de la Frontera,21272.97,1,False,False,False,True,False
+SOL-MEC-015,93176117N,Miguel Iglesias Serrano,"Calle Real 79, 4º A",Vigo,Pontevedra,True,Sevilla,25563.6,3,False,False,False,True,False
+SOL-MEC-016,39920292C,José Reyes Castro,"Calle Ancha 45, 1º B",Almería,Almería,True,Madrid,15292.13,2,False,False,False,True,False
+SOL-MEC-017,28892086S,Elena Castro Castillo,"Paseo del Prado 60, Bajo",Sevilla,Sevilla,False,Sevilla,22992.82,3,False,False,False,True,False
+SOL-MEC-018,23903144A,Laura Hernández Fernández,"Calle San Juan 120, 3º C",A Coruña,A Coruña,False,A Coruña,68307.36,4,False,False,False,True,False
+SOL-MEC-019,46698468G,Nuria Núñez Núñez,"Calle San Juan 66, 3º C",Alicante,Alicante,False,Alicante,22892.67,4,False,False,True,True,False
+SOL-MEC-020,43491314Q,Isabel Moreno Castillo,"Avenida de la Constitución 116, 1º B",Jerez de la Frontera,Cádiz,True,Pontevedra,12473.12,1,False,False,False,True,False
+SOL-MEC-021,98843907G,Álvaro Iglesias Blanco,"Calle Real 35, 2º A",Oviedo,Asturias,False,Oviedo,27589.64,3,True,True,True,True,False
+SOL-MEC-022,10872248X,Marta Rubio Molina,"Calle Ancha 76, 1º B",Madrid,Madrid,False,Madrid,14268.03,2,True,False,False,False,False
+SOL-MEC-023,81210133P,Lucía Sanz Medina,"Rúa Nova 49, 2º B",Valladolid,Valladolid,False,Valladolid,4002.95,4,False,True,True,True,False
+SOL-MEC-024,16990811K,Cristina Jiménez González,"Calle Mayor 96, 2º B",Alicante,Alicante,False,Alicante,16774.71,3,False,False,False,True,False
+SOL-MEC-025,51395350X,Carmen Jiménez Castro,"Calle Independencia 68, 3º C",Gijón,Asturias,False,Gijón,27150.42,4,False,False,True,True,False
+SOL-MEC-026,25015458Z,Ana Ramírez Santos,"Rúa do Franco 72, Bajo",Valladolid,Valladolid,False,Valladolid,15598.31,1,False,False,False,True,False
+SOL-MEC-027,40728046Z,Ana López Molina,"Calle Mayor 10, 3º C",Madrid,Madrid,True,Ferrol,46511.93,4,False,False,False,True,False
+SOL-MEC-028,49910061S,Adrián Rubio Alonso,"Avenida de Portugal 58, 2º A",Madrid,Madrid,False,Madrid,10031.4,1,False,False,False,True,False
+SOL-MEC-029,80027662J,Alejandro Muñoz Santos,"Gran Vía 56, 1º A",Bilbao,Vizcaya,False,Bilbao,9003.19,3,False,False,True,True,False
+SOL-MEC-030,51708177Z,Jorge García Castillo,"Calle Colón 91, 1º A",Granada,Granada,False,Granada,32918.33,3,False,False,True,True,False
+SOL-MEC-031,76669607G,Lucía Jiménez Blanco,"Avenida de la Constitución 117, 2º B",Oviedo,Asturias,False,Oviedo,23559.03,3,False,False,True,True,False
+SOL-MEC-032,16818112Y,Manuel Rubio Álvarez,"Avenida de Galicia 65, 2º A",Oviedo,Asturias,True,Barcelona,23809.75,1,False,False,False,True,False
+SOL-MEC-033,25014631S,Pedro Alonso Ruiz,"Rúa Nova 63, Bajo",A Coruña,A Coruña,False,A Coruña,6836.6,2,False,False,False,True,True
+SOL-MEC-034,61536717X,Andrés Castro Ruiz,"Calle Cervantes 92, 3º C",Gijón,Asturias,False,Gijón,20791.54,2,False,False,False,True,False
+SOL-MEC-035,36726767E,David Martínez López,"Calle San Juan 29, 4º A",Madrid,Madrid,False,Madrid,6435.08,1,False,False,False,True,False
+SOL-MEC-036,30364454S,David Gil Alonso,"Calle Real 74, 3º C",Alicante,Alicante,True,Ferrol,22338.09,4,False,False,True,True,False
+SOL-MEC-037,63238057V,Sara González Serrano,"Calle San Juan 74, 3º C",A Coruña,A Coruña,True,Sevilla,38526.02,5,True,False,False,True,False
+SOL-MEC-038,24665841C,Miguel Reyes Reyes,"Paseo del Prado 8, 2º A",Vitoria,Álava,True,Salamanca,22882.5,1,False,False,False,True,False
+SOL-MEC-039,55754284F,Marta Ortega Alonso,"Calle Cervantes 49, 2º A",San Sebastián,Guipúzcoa,True,Oviedo,18491.03,2,False,False,False,True,False
+SOL-MEC-040,54619335Q,Jorge Santos Delgado,"Calle Ancha 69, 2º A",Ourense,Ourense,True,Granada,3406.63,1,False,False,False,True,False
+SOL-MEC-041,87201917Q,Adrián Martínez Álvarez,"Avenida de Galicia 4, Bajo",Sevilla,Sevilla,True,Madrid,31950.02,4,False,False,True,True,False
+SOL-MEC-042,17507864B,Elena López Navarro,"Rúa Nova 108, 4º A",Oviedo,Asturias,False,Oviedo,7019.43,2,False,False,False,True,True
+SOL-MEC-043,42787299P,Pedro Romero Flores,"Calle del Sol 113, Bajo",Ourense,Ourense,False,Ourense,61806.54,4,False,False,False,True,False
+SOL-MEC-044,29175900D,Paula Torres Ruiz,"Calle Independencia 51, 3º C",Vitoria,Álava,True,Oviedo,14394.52,4,False,False,False,True,True
+SOL-MEC-045,84087145L,Ana Flores García,"Calle Real 21, 1º A",Oviedo,Asturias,True,Vigo,36446.98,5,False,False,True,True,False
+SOL-MEC-046,40587988A,Lucía Pérez Jiménez,"Calle Real 6, 3º C",Pamplona,Navarra,False,Pamplona,9031.22,1,False,False,False,False,False
+SOL-MEC-047,73481797V,Sofía Delgado Ramírez,"Avenida de la Constitución 41, 3º C",Murcia,Murcia,False,Murcia,38168.53,4,False,False,True,True,False
+SOL-MEC-048,38682516N,Beatriz Núñez Flores,"Calle Ancha 57, 3º C",Bilbao,Vizcaya,False,Bilbao,23525.7,4,False,False,False,True,False
+SOL-MEC-049,99152472R,Daniel Muñoz Navarro,"Calle del Sol 56, Bajo",Pontevedra,Pontevedra,False,Pontevedra,13651.74,1,False,False,False,True,False
+SOL-MEC-050,55610493N,Cristina García Díaz,"Avenida de Galicia 90, 4º A",Vigo,Pontevedra,True,Valencia,36944.11,5,True,False,False,True,False
+SOL-MEC-051,71367643T,Andrea González García,"Gran Vía 86, 3º C",Málaga,Málaga,True,Valencia,61639.13,5,False,False,False,True,False
+SOL-MEC-052,97225156Q,Pedro Marín Garrido,"Calle San Juan 52, 3º C",Pontevedra,Pontevedra,False,Pontevedra,32730.6,5,False,False,False,True,True
+SOL-MEC-053,48604965P,Marina Alonso Moreno,"Rúa do Franco 112, 3º C",Zaragoza,Zaragoza,True,Ferrol,20520.4,2,False,False,False,True,False
+SOL-MEC-054,29348212M,Nuria Ramírez González,"Calle Ancha 2, 3º C",Lugo,Lugo,False,Lugo,25645.66,4,False,False,True,True,False
+SOL-MEC-055,40532273V,Pedro Díaz Alonso,"Paseo del Prado 107, 1º A",Valencia,Valencia,True,Valencia,7417.72,2,False,False,False,True,False
+SOL-MEC-056,45059710L,Javier Serrano Hernández,"Rúa Nova 4, Bajo",Almería,Almería,False,Almería,3073.9,3,False,False,False,True,False
+SOL-MEC-057,71662963T,Silvia Fernández Delgado,"Calle del Sol 78, 1º B",Castellón,Castellón,True,Ferrol,11222.49,3,False,False,True,False,False
+SOL-MEC-058,31203129H,Ana Marín Moreno,"Calle San Juan 87, 2º B",Bilbao,Vizcaya,False,Bilbao,9328.93,2,False,False,False,True,False
+SOL-MEC-059,82613940X,Carmen Muñoz González,"Avenida de Portugal 41, 3º C",Oviedo,Asturias,True,Valladolid,27983.54,4,False,False,True,True,False
+SOL-MEC-060,52352128B,Francisco Santos Díaz,"Calle Colón 16, 3º C",Barcelona,Barcelona,True,Pontevedra,33678.91,5,False,False,False,True,False
+SOL-MEC-061,87054398L,Elena Rubio Castillo,"Calle del Sol 15, 4º A",Castellón,Castellón,True,Barcelona,10527.51,1,False,False,False,True,False
+SOL-MEC-062,46468984Z,Daniel Navarro Santos,"Calle Real 92, 1º B",Bilbao,Vizcaya,True,Madrid,31618.86,3,False,False,False,True,False
+SOL-MEC-063,35511941X,Paula López Rubio,"Paseo del Prado 50, 2º B",Córdoba,Córdoba,False,Córdoba,4534.19,1,False,False,False,True,False
+SOL-MEC-064,99115205V,Adrián Ortega Núñez,"Avenida de Portugal 89, 1º A",Madrid,Madrid,True,Valencia,37664.36,5,False,False,False,True,False
+SOL-MEC-065,50559278B,Nuria Fernández Torres,"Calle Ancha 117, 3º C",Vitoria,Álava,False,Vitoria,14370.79,1,False,False,False,True,False
+SOL-MEC-066,73791320Y,Jorge Flores Hernández,"Gran Vía 17, 3º C",Burgos,Burgos,False,Burgos,5155.23,1,False,False,False,True,True
+SOL-MEC-067,33776150Y,Inés Iglesias Sanz,"Gran Vía 98, 4º A",Granada,Granada,True,Santiago de Compostela,31309.36,3,False,False,True,True,False
+SOL-MEC-068,69849511Y,Marta Núñez Marín,"Rúa do Franco 107, 2º B",Bilbao,Vizcaya,False,Bilbao,11958.12,4,False,False,True,True,False
+SOL-MEC-069,72372114S,Rocío Muñoz Delgado,"Calle Ancha 32, 4º A",Barcelona,Barcelona,False,Barcelona,37429.52,4,False,False,True,True,False
+SOL-MEC-070,59858348C,Isabel Jiménez Núñez,"Avenida de Portugal 106, 3º C",Barcelona,Barcelona,False,Barcelona,8572.26,3,False,False,True,True,False
+SOL-MEC-071,91756179W,Inés Flores Santos,"Avenida de Galicia 90, 3º C",Oviedo,Asturias,True,Santiago de Compostela,7379.09,1,False,False,True,False,False
+SOL-MEC-072,33581357T,Laura Delgado Santos,"Calle Mayor 64, 3º C",Lugo,Lugo,True,Bilbao,7615.67,5,False,False,False,True,False
+SOL-MEC-073,22246348N,Raquel Moreno Ortiz,"Rúa do Franco 82, 4º A",Gijón,Asturias,True,Valladolid,20882.42,5,False,False,False,True,False
+SOL-MEC-074,66240084S,Silvia Santos Blanco,"Avenida de Portugal 110, 4º A",Valencia,Valencia,False,Valencia,27575.75,5,False,False,False,True,False
+SOL-MEC-075,93926371Y,Rafael Medina Blanco,"Avenida de España 65, Bajo",Córdoba,Córdoba,False,Córdoba,5671.04,1,False,True,False,True,True
+SOL-MEC-076,65692629Y,Daniel Medina Álvarez,"Calle Real 36, 4º A",Ourense,Ourense,False,Ourense,15691.55,2,False,False,False,True,False
+SOL-MEC-077,98787891Q,Pedro González Medina,"Avenida de la Constitución 45, 2º B",Gijón,Asturias,True,Bilbao,11002.27,2,False,False,False,True,False
+SOL-MEC-078,24716857E,David Flores Rubio,"Calle Independencia 12, 4º A",Ourense,Ourense,True,Ferrol,23317.82,5,False,False,False,True,True
+SOL-MEC-079,82398083P,Pedro Garrido Medina,"Calle Cervantes 17, 4º A",Vigo,Pontevedra,False,Vigo,13261.59,1,True,False,False,True,False
+SOL-MEC-080,16740197S,Jorge Ruiz Fernández,"Calle Colón 23, 4º A",Murcia,Murcia,True,Oviedo,14171.31,2,False,False,False,True,False
+SOL-MEC-081,18357162B,Carlos Ortiz Delgado,"Rúa Nova 70, 2º A",Murcia,Murcia,True,Bilbao,2848.74,1,False,False,False,True,False
+SOL-MEC-082,22513132L,Álvaro Rodríguez Ortega,"Calle Independencia 9, Bajo",Alcalá de Henares,Madrid,True,Santiago de Compostela,25120.72,4,False,False,True,True,False
+SOL-MEC-083,63904155N,Álvaro Rodríguez Iglesias,"Avenida de la Constitución 62, 4º A",A Coruña,A Coruña,False,A Coruña,14189.7,1,False,False,False,True,False
+SOL-MEC-084,52213778Y,Paula Navarro Fernández,"Avenida de la Constitución 59, Bajo",Málaga,Málaga,False,Málaga,3668.78,3,False,False,False,True,False
+SOL-MEC-085,25374874D,Silvia Álvarez Molina,"Calle Mayor 88, 3º C",Castellón,Castellón,False,Castellón,9896.86,5,False,False,False,True,True
+SOL-MEC-086,45507920M,Inés Serrano Reyes,"Calle Real 88, 1º A",Bilbao,Vizcaya,False,Bilbao,33522.45,4,False,False,False,True,False
+SOL-MEC-087,93131979B,Manuel Ortiz Serrano,"Calle Colón 75, 2º B",Lugo,Lugo,True,Ferrol,47448.3,5,False,False,False,True,False
+SOL-MEC-088,72732043V,Laura Muñoz Santos,"Avenida de Portugal 93, 1º A",Salamanca,Salamanca,False,Salamanca,17093.72,2,False,False,False,True,False
+SOL-MEC-089,39161443X,Patricia Marín Ruiz,"Avenida de la Constitución 89, 1º B",Barcelona,Barcelona,False,Barcelona,21268.59,2,False,False,False,True,False
+SOL-MEC-090,60882459X,Andrea Morales Sanz,"Calle Ancha 24, Bajo",Castellón,Castellón,True,Barcelona,12522.49,1,False,False,False,True,False
+SOL-MEC-091,99991136Q,Silvia Ortiz Serrano,"Avenida de Portugal 59, 1º B",Ourense,Ourense,False,Ourense,11009.62,1,False,False,False,True,False
+SOL-MEC-092,22304198V,Carlos Blanco Martínez,"Paseo del Prado 109, 4º A",Pontevedra,Pontevedra,True,Oviedo,13494.85,3,False,False,True,True,False
+SOL-MEC-093,54098516D,David Blanco García,"Calle Cervantes 76, 1º A",Burgos,Burgos,True,Madrid,10689.73,1,False,False,False,True,False
+SOL-MEC-094,81216573P,Beatriz Reyes Moreno,"Calle Real 66, 3º C",Vigo,Pontevedra,True,Lugo,32345.75,4,False,False,True,True,False
+SOL-MEC-095,40667888R,Nuria Molina Sanz,"Calle Cervantes 56, 2º A",Castellón,Castellón,False,Castellón,39205.09,5,True,False,False,True,False
+SOL-MEC-096,68942178T,Francisco Sanz Alonso,"Calle San Juan 77, 3º C",Salamanca,Salamanca,True,Valencia,6987.67,4,False,False,True,True,False
+SOL-MEC-097,96750368V,Carmen Alonso Marín,"Paseo del Prado 116, 3º C",Ourense,Ourense,False,Ourense,5115.13,3,False,False,False,True,False
+SOL-MEC-098,21828592M,Álvaro Rodríguez Ruiz,"Calle Ancha 107, 3º C",Granada,Granada,True,Granada,36905.66,5,False,False,False,True,False
+SOL-MEC-099,61185849F,Rocío Moreno Gil,"Calle Independencia 14, 1º A",Castellón,Castellón,False,Castellón,25829.03,5,False,False,True,True,False
+SOL-MEC-100,20450542T,Andrea Gil Rubio,"Rúa do Franco 3, 2º A",Santiago de Compostela,A Coruña,False,Santiago de Compostela,23218.74,2,False,False,False,True,False

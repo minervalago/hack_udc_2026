@@ -17,12 +17,13 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCR6QkC4eRR0pa4fEBgagInYbnsrmsJoZE',
-    appId: '1:1097696584923:web:28197fce9d2f367f6398fe',
-    messagingSenderId: '1097696584923',
-    projectId: 'denodo-hackudc-2026',
-    authDomain: 'denodo-hackudc-2026.firebaseapp.com',
-    storageBucket: 'denodo-hackudc-2026.firebasestorage.app',
-    measurementId: 'G-D7TJ549JBG',
+    apiKey: 'API_KEY',
+    appId: 'APP_ID',
+    messagingSenderId: 'MESSAGING_SENDER_ID',
+    projectId: 'PROJECT_ID',
+    authDomain: 'AUTH_DOMAIN',
+    databaseURL: 'DATABASE_URL',
+    storageBucket: 'STORAGE_BUCKET',
+    measurementId: 'MEASUREMENT_ID',
   );
 }

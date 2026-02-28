@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
+import '../models/chat_session.dart';
 import '../providers/query_provider.dart';
 import '../services/auth_service.dart';
 import '../services/denodo_service.dart';
@@ -114,27 +115,10 @@ class _Sidebar extends StatelessWidget {
               itemBuilder: (context, index) {
                 final session = sessions[index];
                 final isSelected = session == provider.currentSession;
-                return InkWell(
-                  onTap: () => provider.loadSession(session),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    color: isSelected
-                        ? Colors.black.withValues(alpha: 0.12)
-                        : Colors.transparent,
-                    child: Text(
-                      session.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                    ),
-                  ),
+                return _SessionTile(
+                  session: session,
+                  isSelected: isSelected,
+                  provider: provider,
                 );
               },
             ),
@@ -146,6 +130,118 @@ class _Sidebar extends StatelessWidget {
     );
   }
 }
+
+class _SessionTile extends StatelessWidget {
+  const _SessionTile({
+    required this.session,
+    required this.isSelected,
+    required this.provider,
+  });
+
+  final ChatSession session;
+  final bool isSelected;
+  final QueryProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => provider.loadSession(session),
+      child: Container(
+        padding: const EdgeInsets.only(left: 16, right: 4, top: 10, bottom: 10),
+        color: isSelected
+            ? Colors.black.withValues(alpha: 0.12)
+            : Colors.transparent,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                session.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight:
+                      isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ),
+            PopupMenuButton<_SessionAction>(
+              icon: const Icon(Icons.more_vert, color: Colors.white70, size: 16),
+              color: const Color(0xFF333333),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              onSelected: (action) {
+                if (action == _SessionAction.rename) {
+                  _showRenameDialog(context);
+                } else {
+                  provider.deleteSession(session.id);
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: _SessionAction.rename,
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined, size: 16, color: Colors.white70),
+                      SizedBox(width: 8),
+                      Text('Cambiar nombre',
+                          style: TextStyle(color: Colors.white, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: _SessionAction.delete,
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                      SizedBox(width: 8),
+                      Text('Eliminar',
+                          style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRenameDialog(BuildContext context) {
+    final controller = TextEditingController(text: session.customTitle ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cambiar nombre'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Nombre del chat'),
+          onSubmitted: (_) => _applyRename(ctx, controller.text),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => _applyRename(ctx, controller.text),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyRename(BuildContext ctx, String name) {
+    provider.renameSession(session.id, name);
+    Navigator.pop(ctx);
+  }
+}
+
+enum _SessionAction { rename, delete }
 
 class _DatabaseSelector extends StatelessWidget {
   const _DatabaseSelector({required this.provider});
@@ -167,9 +263,12 @@ class _DatabaseSelector extends StatelessWidget {
               ),
             ),
             SizedBox(width: 10),
-            Text(
-              'Cargando bases de datos...',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+            Expanded(
+              child: Text(
+                'Cargando bases de datos...',
+                style: TextStyle(color: Colors.white70, fontSize: 13),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -311,7 +410,7 @@ class _UserTile extends StatelessWidget {
                       width: 36,
                       height: 36,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _UserInitial(initial),
+                      errorBuilder: (_, _, _) => _UserInitial(initial),
                     )
                   : _UserInitial(initial),
             ),
@@ -594,6 +693,8 @@ class _MessageBubble extends StatelessWidget {
                   onTap: () => onSend(q),
                 )),
           ],
+          if (showExtras && api?.htmlReport != null)
+            _ReportActions(htmlReport: api!.htmlReport!),
           if (showExtras)
             Align(
               alignment: Alignment.centerRight,
@@ -605,6 +706,88 @@ class _MessageBubble extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReportActions extends StatelessWidget {
+  const _ReportActions({required this.htmlReport});
+  final String htmlReport;
+
+  @override
+  Widget build(BuildContext context) {
+    final userEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Row(
+        children: [
+          _ReportButton(
+            icon: Icons.download_outlined,
+            label: 'Descargar informe',
+            onTap: () => _download(context),
+          ),
+          const SizedBox(width: 10),
+          _ReportButton(
+            icon: Icons.email_outlined,
+            label: 'Enviar por correo',
+            onTap: () => _email(context, userEmail),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _download(BuildContext context) async {
+    try {
+      final path = await saveHtmlFile(htmlReport);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Informe guardado: $path'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar el informe: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _email(BuildContext context, String toEmail) async {
+    await _download(context);
+    openEmailCompose(toEmail, 'Informe Deep Query — Administrador de Becas');
+  }
+}
+
+class _ReportButton extends StatelessWidget {
+  const _ReportButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: _kAccentColor,
+        side: const BorderSide(color: _kAccentColor),
+        textStyle: const TextStyle(fontSize: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       ),
     );
   }

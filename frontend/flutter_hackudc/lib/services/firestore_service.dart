@@ -21,4 +21,8 @@ class FirestoreService {
   static Future<void> saveSession(String uid, ChatSession session) async {
     await _sessionsRef(uid).doc(session.id).set(session.toJson());
   }
+
+  static Future<void> deleteSession(String uid, String sessionId) async {
+    await _sessionsRef(uid).doc(sessionId).delete();
+  }
 }

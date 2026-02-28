@@ -4,14 +4,17 @@ class ChatSession {
   final String id;
   final String database;
   final List<ChatMessage> messages;
+  String? customTitle;
 
   ChatSession({
     required this.id,
     required this.database,
     List<ChatMessage>? messages,
+    this.customTitle,
   }) : messages = messages ?? [];
 
   String get title {
+    if (customTitle != null && customTitle!.isNotEmpty) return customTitle!;
     try {
       final first = messages.firstWhere((m) => m.isUser);
       final text = first.content;
@@ -23,6 +26,7 @@ class ChatSession {
 
   Map<String, dynamic> toJson() => {
         'database': database,
+        'customTitle': customTitle,
         'messages': messages.map((m) => m.toJson()).toList(),
         'updatedAt': DateTime.now().millisecondsSinceEpoch,
       };
@@ -34,6 +38,7 @@ class ChatSession {
     return ChatSession(
       id: id,
       database: json['database'] as String? ?? '',
+      customTitle: json['customTitle'] as String?,
       messages: msgs,
     );
   }

@@ -19,7 +19,7 @@ class QueryProvider extends ChangeNotifier {
   bool loadingDatabases = false;
   String? databasesError;
 
-  final List<String> models = ['Turbo', 'Pro'];
+  final List<String> models = ['Turbo', 'Deep'];
   List<String> databases = [];
 
   List<ChatSession> get sessions =>
@@ -48,7 +48,10 @@ class QueryProvider extends ChangeNotifier {
     try {
       final fetched =
           await FirestoreService.loadSessions(_userId!, selectedDatabase);
-      _sessions.removeWhere((s) => s.database == selectedDatabase);
+      if (fetched.isEmpty) return; // keep in-memory sessions if Firestore has none
+      final fetchedIds = fetched.map((s) => s.id).toSet();
+      _sessions.removeWhere(
+          (s) => s.database == selectedDatabase && fetchedIds.contains(s.id));
       _sessions.addAll(fetched);
       notifyListeners();
     } catch (_) {
@@ -88,6 +91,25 @@ class QueryProvider extends ChangeNotifier {
     _currentSession = session;
     showOptions = false;
     notifyListeners();
+  }
+
+  void renameSession(String id, String newTitle) {
+    final session = _sessions.firstWhere((s) => s.id == id);
+    session.customTitle = newTitle.trim().isEmpty ? null : newTitle.trim();
+    notifyListeners();
+    if (_userId != null) {
+      FirestoreService.saveSession(_userId!, session).ignore();
+    }
+  }
+
+  void deleteSession(String id) {
+    final session = _sessions.firstWhere((s) => s.id == id);
+    _sessions.remove(session);
+    if (_currentSession?.id == id) _currentSession = null;
+    notifyListeners();
+    if (_userId != null) {
+      FirestoreService.deleteSession(_userId!, id).ignore();
+    }
   }
 
   void selectModel(String model) {
@@ -132,6 +154,7 @@ class QueryProvider extends ChangeNotifier {
     final response = await DenodoService.query(
       question: text.trim(),
       model: selectedModel,
+      database: selectedDatabase,
       plot: wantsPlot,
       onPhaseChange: (phase) {
         loadingPhase = phase;

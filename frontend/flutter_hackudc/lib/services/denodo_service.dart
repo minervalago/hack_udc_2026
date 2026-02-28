@@ -5,9 +5,8 @@ const _baseUrl = 'localhost:8008';
 const _username = 'admin';
 const _password = 'admin';
 
-// Timeout per model: o1 needs much more time for reasoning
 const _turboTimeout = Duration(seconds: 60);
-const _proTimeout = Duration(seconds: 180);
+const _deepTimeout = Duration(seconds: 300);
 
 class ApiResponse {
   final String answer;
@@ -16,6 +15,7 @@ class ApiResponse {
   final List<String> relatedQuestions;
   final String? rawGraph;
   final List<String> tablesUsed;
+  final String? htmlReport; // only present in Deep mode
 
   const ApiResponse({
     required this.answer,
@@ -24,6 +24,7 @@ class ApiResponse {
     this.relatedQuestions = const [],
     this.rawGraph,
     this.tablesUsed = const [],
+    this.htmlReport,
   });
 
   factory ApiResponse.fromJson(Map<String, dynamic> json) {
@@ -57,16 +58,20 @@ class DenodoService {
         'Authorization': _authHeader,
       };
 
-  // Phase 1: discover which tables/columns are available for the question.
-  // Returns a plain-text description that phase 2 uses to build the VQL query.
+  static Map<String, String> get _jsonHeaders => {
+        'accept': 'application/json',
+        'Authorization': _authHeader,
+        'Content-Type': 'application/json',
+      };
+
+  // Turbo Phase 1: discover which tables/columns are available for the question.
   static Future<String> _discoverMetadata({
     required String question,
-    required String llmModel,
   }) async {
     final uri = Uri.http(_baseUrl, '/answerMetadataQuestion', {
       'question': question,
       'llm_provider': 'openai',
-      'llm_model': llmModel,
+      'llm_model': 'gpt-4o-mini',
       'llm_temperature': '0',
       'embeddings_provider': 'openai',
       'embeddings_model': 'text-embedding-3-small',
@@ -77,7 +82,7 @@ class DenodoService {
 
     final response = await http
         .get(uri, headers: _headers)
-        .timeout(_turboTimeout); // metadata phase always uses fast timeout
+        .timeout(_turboTimeout);
 
     if (response.statusCode != 200) {
       throw Exception('Metadata error ${response.statusCode}');
@@ -87,15 +92,12 @@ class DenodoService {
     return data['answer'] as String? ?? '';
   }
 
-  // Phase 2: run the actual VQL query and return ranked candidates.
+  // Turbo Phase 2: run the actual VQL query and return ranked candidates.
   static Future<ApiResponse> _queryData({
     required String question,
     required String metadataContext,
-    required String llmModel,
     required bool plot,
   }) async {
-    // Enrich the question with the metadata discovered in phase 1 so the LLM
-    // can build precise VQL without guessing column names.
     final enrichedQuestion =
         '$question\n\n[Contexto de esquema disponible]:\n$metadataContext';
 
@@ -106,7 +108,7 @@ class DenodoService {
       'embeddings_model': 'text-embedding-3-small',
       'vector_store_provider': 'chroma',
       'llm_provider': 'openai',
-      'llm_model': llmModel,
+      'llm_model': 'gpt-4o-mini',
       'llm_temperature': '0',
       'llm_max_tokens': '4096',
       'allow_external_associations': 'false',
@@ -118,13 +120,14 @@ class DenodoService {
       'vector_search_column_description_char_limit': '200',
       'disclaimer': 'true',
       'verbose': 'true',
-      'check_ambiguity': 'false', // already resolved in phase 1
+      'check_ambiguity': 'false',
       'vql_execute_rows_limit': '100',
       'llm_response_rows_limit': '25',
     });
 
-    final timeout = llmModel == 'o1' ? _proTimeout : _turboTimeout;
-    final response = await http.get(uri, headers: _headers).timeout(timeout);
+    final response = await http
+        .get(uri, headers: _headers)
+        .timeout(_turboTimeout);
 
     if (response.statusCode != 200) {
       throw Exception('Query error ${response.statusCode}: ${response.reasonPhrase}');
@@ -134,8 +137,84 @@ class DenodoService {
     return ApiResponse.fromJson(data);
   }
 
+  // Deep Phase 1: /deepQuery with o1 as thinking model.
+  static Future<Map<String, dynamic>> _runDeepQuery({
+    required String question,
+    required String database,
+  }) async {
+    final uri = Uri.http(_baseUrl, '/deepQuery');
+    final body = jsonEncode({
+      'question': question,
+      'execution_model': 'thinking',
+      'default_rows': 10,
+      'max_analysis_loops': 50,
+      'max_concurrent_tool_calls': 5,
+      'thinking_llm_provider': 'openai',
+      'thinking_llm_model': 'o1',
+      'thinking_llm_temperature': 1,
+      'thinking_llm_max_tokens': 10240,
+      'llm_provider': 'openai',
+      'llm_model': 'gpt-4o-mini',
+      'llm_temperature': 0,
+      'llm_max_tokens': 4096,
+      'embeddings_provider': 'openai',
+      'embeddings_model': 'text-embedding-3-small',
+      'vector_store_provider': 'chroma',
+      'vdp_database_names': database,
+      'vdp_tag_names': '',
+      'allow_external_associations': false,
+      'use_views': '',
+      'expand_set_views': true,
+      'vector_search_k': 5,
+      'vector_search_sample_data_k': 3,
+    });
+
+    final response = await http
+        .post(uri, headers: _jsonHeaders, body: body)
+        .timeout(_deepTimeout);
+
+    if (response.statusCode != 200) {
+      final detail = utf8.decode(response.bodyBytes);
+      throw Exception('DeepQuery error ${response.statusCode}: $detail');
+    }
+
+    return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  // Deep Phase 2: /generateDeepQueryReport — builds HTML report from metadata.
+  static Future<String> _generateDeepReport({
+    required Map<String, dynamic> metadata,
+  }) async {
+    final uri = Uri.http(_baseUrl, '/generateDeepQueryReport');
+    final body = jsonEncode({
+      'deepquery_metadata': metadata,
+      'color_palette': 'red',
+      'max_reporting_loops': 25,
+      'include_failed_tool_calls_appendix': false,
+      'thinking_llm_provider': 'openai',
+      'thinking_llm_model': 'o1',
+      'thinking_llm_temperature': 1,
+      'thinking_llm_max_tokens': 10240,
+      'llm_provider': 'openai',
+      'llm_model': 'gpt-4o-mini',
+      'llm_temperature': 0,
+      'llm_max_tokens': 4096,
+    });
+
+    final response = await http
+        .post(uri, headers: _jsonHeaders, body: body)
+        .timeout(_deepTimeout);
+
+    if (response.statusCode != 200) {
+      final detail = utf8.decode(response.bodyBytes);
+      throw Exception('Report error ${response.statusCode}: $detail');
+    }
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    return data['html_report'] as String? ?? '';
+  }
+
   /// Fetches the list of available VDP databases from /getVectorDBInfo.
-  /// Returns the keys under syncedResources.DATABASE.
   static Future<List<String>> fetchDatabases() async {
     final uri = Uri.http(_baseUrl, '/getVectorDBInfo');
     final response = await http
@@ -154,46 +233,49 @@ class DenodoService {
     return dbs.keys.toList();
   }
 
-  /// Public entry point. Runs the mandatory two-phase flow:
-  ///   1. /answerMetadataQuestion — schema discovery
-  ///   2. /answerDataQuestion     — VQL execution + ranking
-  ///
-  /// [model] must be 'Turbo' or 'Pro' (matches UI selector labels).
-  /// [onPhaseChange] is called with a human-readable status string so the UI
-  /// can update the loading indicator between phases.
+  /// Public entry point. Branches by model:
+  ///   Turbo → 2-phase flow (/answerMetadataQuestion + /answerDataQuestion) with gpt-4o-mini
+  ///   Deep  → /deepQuery (o1) + /generateDeepQueryReport → ApiResponse with htmlReport
   static Future<ApiResponse> query({
     required String question,
     required String model,
+    required String database,
     bool plot = false,
     void Function(String phase)? onPhaseChange,
   }) async {
-    final llmModel = model == 'Pro' ? 'o1' : 'gpt-4o';
-
     try {
-      // ── Phase 1 ─────────────────────────────────────────────────────────
-      onPhaseChange?.call('Descubriendo esquema de datos...');
-      final metadata = await _discoverMetadata(
-        question: question,
-        llmModel: llmModel,
-      );
+      if (model == 'Deep') {
+        onPhaseChange?.call('Iniciando análisis profundo con o1...');
+        final deepResult = await _runDeepQuery(
+          question: question,
+          database: database,
+        );
+        final answer = deepResult['answer'] as String? ?? '';
+        final metadata =
+            deepResult['deepquery_metadata'] as Map<String, dynamic>? ?? {};
 
-      // ── Phase 2 ─────────────────────────────────────────────────────────
-      onPhaseChange?.call(
-        model == 'Pro'
-            ? 'Analizando candidatos en profundidad...'
-            : 'Consultando base de datos...',
-      );
-      return await _queryData(
-        question: question,
-        metadataContext: metadata,
-        llmModel: llmModel,
-        plot: plot,
-      );
+        onPhaseChange?.call('Generando informe detallado...');
+        final htmlReport = await _generateDeepReport(metadata: metadata);
+
+        return ApiResponse(answer: answer, htmlReport: htmlReport);
+      } else {
+        onPhaseChange?.call('Descubriendo esquema de datos...');
+        final metadata = await _discoverMetadata(question: question);
+
+        onPhaseChange?.call('Consultando base de datos...');
+        return await _queryData(
+          question: question,
+          metadataContext: metadata,
+          plot: plot,
+        );
+      }
     } on Exception catch (e) {
       final msg = e.toString();
       if (msg.contains('TimeoutException')) {
         return ApiResponse.error(
-          'La consulta tardó demasiado. Prueba con el modo Turbo o simplifica la pregunta.',
+          model == 'Deep'
+              ? 'El análisis profundo tardó demasiado. Simplifica la pregunta o prueba con Turbo.'
+              : 'La consulta tardó demasiado. Prueba con el modo Turbo o simplifica la pregunta.',
         );
       }
       if (msg.contains('SocketException') || msg.contains('Connection refused')) {

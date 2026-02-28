@@ -1,0 +1,6 @@
+﻿Tipo Beca;repite_curso;nacionalidad_española;familia_numerosa;orfandad;discapacidad;renta_anual_familiar;reside_fuera
+MEC;True;True;True;True;True;True;True
+General;False;True;True;False;False;True;True
+Movilidad;False;True;False;False;False;False;True
+Comedor;False;True;True;False;False;True;False
+Excelencia;False;True;False;False;True;False;False

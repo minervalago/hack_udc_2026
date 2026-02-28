@@ -5,7 +5,7 @@ Herramienta de apoyo a la decisión basada en IA para filtrar y recomendar candi
 ---
 ![chat](img/chat.png)
 ![mas_opciones](img/mas_opciones.png)
-![principal](principal.png)
+![principal](img/principal.png)
 
 ## Arquitectura
 

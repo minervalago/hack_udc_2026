@@ -663,9 +663,129 @@ class _LoadingIndicator extends StatelessWidget {
   }
 }
 
+// ── Candidate card data & parsing ─────────────────────────────────────────────
+
+class _CandidateData {
+  const _CandidateData({
+    required this.rank,
+    required this.name,
+    this.renta,
+    this.discapacidad,
+    this.orfandad,
+    this.familiaNumerosa,
+    this.resideFuera,
+    this.extra = const {},
+  });
+
+  final int rank;
+  final String name;
+  final String? renta;
+  final bool? discapacidad;
+  final bool? orfandad;
+  final bool? familiaNumerosa;
+  final bool? resideFuera;
+  final Map<String, String> extra;
+}
+
+bool? _parseBool(String val) {
+  final v = val.trim().toLowerCase();
+  if (v == 'sí' || v == 'si' || v == 'yes' || v == 'true' || v == '1') return true;
+  if (v == 'no' || v == 'false' || v == '0') return false;
+  return null;
+}
+
+List<_CandidateData>? _parseMarkdownTable(String content) {
+  final lines = content.split('\n');
+
+  int? headerIdx;
+  for (int i = 0; i < lines.length - 1; i++) {
+    if (lines[i].trim().startsWith('|') &&
+        i + 1 < lines.length &&
+        lines[i + 1].trim().startsWith('|') &&
+        lines[i + 1].contains('-')) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx == null) return null;
+
+  final headers = lines[headerIdx]
+      .split('|')
+      .map((h) => h.trim().toLowerCase())
+      .where((h) => h.isNotEmpty)
+      .toList();
+
+  if (headers.length < 2) return null;
+
+  int col(List<String> keys) {
+    for (final key in keys) {
+      final i = headers.indexWhere((h) => h.contains(key));
+      if (i != -1) return i;
+    }
+    return -1;
+  }
+
+  final nameIdx = col(['nombre', 'name', 'solicitante', 'candidato']);
+  if (nameIdx == -1) return null;
+
+  final rankIdx = col(['#', 'rank', 'puesto', 'posición', 'posicion', 'rango', 'orden']);
+  final rentaIdx = col(['renta', 'income', 'euros', 'ingreso']);
+  final discapIdx = col(['discap']);
+  final orfanIdx = col(['orfan']);
+  final famNumIdx = col(['familia_numerosa', 'fam_num', 'fam. num', 'familia numerosa', 'numerosa']);
+  final resideIdx = col(['reside', 'fuera', 'domicilio']);
+
+  final known = {nameIdx, rankIdx, rentaIdx, discapIdx, orfanIdx, famNumIdx, resideIdx};
+
+  final candidates = <_CandidateData>[];
+  int autoRank = 0;
+
+  for (int i = headerIdx + 2; i < lines.length; i++) {
+    final line = lines[i].trim();
+    if (!line.startsWith('|')) break;
+
+    final cells = line
+        .split('|')
+        .map((c) => c.trim())
+        .where((c) => c.isNotEmpty)
+        .toList();
+
+    if (cells.length < 2) continue;
+
+    String at(int idx) => idx >= 0 && idx < cells.length ? cells[idx] : '';
+
+    autoRank++;
+    final rankStr = rankIdx >= 0 ? at(rankIdx) : autoRank.toString();
+    final rank = int.tryParse(rankStr.replaceAll(RegExp(r'[^\d]'), '')) ?? autoRank;
+
+    final name = at(nameIdx);
+    if (name.isEmpty || name == '-') continue;
+
+    final extra = <String, String>{};
+    for (int j = 0; j < cells.length && j < headers.length; j++) {
+      if (!known.contains(j) && cells[j].isNotEmpty && cells[j] != '-') {
+        extra[headers[j]] = cells[j];
+      }
+    }
+
+    candidates.add(_CandidateData(
+      rank: rank,
+      name: name,
+      renta: rentaIdx >= 0 ? at(rentaIdx) : null,
+      discapacidad: discapIdx >= 0 ? _parseBool(at(discapIdx)) : null,
+      orfandad: orfanIdx >= 0 ? _parseBool(at(orfanIdx)) : null,
+      familiaNumerosa: famNumIdx >= 0 ? _parseBool(at(famNumIdx)) : null,
+      resideFuera: resideIdx >= 0 ? _parseBool(at(resideIdx)) : null,
+      extra: extra,
+    ));
+  }
+
+  return candidates.isEmpty ? null : candidates;
+}
+
 // ── Message bubble ────────────────────────────────────────────────────────────
 
-class _MessageBubble extends StatelessWidget {
+class _MessageBubble extends StatefulWidget {
   const _MessageBubble({
     required this.message,
     required this.showExtras,
@@ -679,7 +799,19 @@ class _MessageBubble extends StatelessWidget {
   final void Function(String?) onSend;
 
   @override
+  State<_MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends State<_MessageBubble> {
+  bool _showCards = false;
+
+  @override
   Widget build(BuildContext context) {
+    final message = widget.message;
+    final showExtras = widget.showExtras;
+    final provider = widget.provider;
+    final onSend = widget.onSend;
+
     if (message.isUser) {
       final leftMargin = MediaQuery.of(context).size.width < 600 ? 40.0 : 80.0;
       return Align(
@@ -699,50 +831,72 @@ class _MessageBubble extends StatelessWidget {
       );
     }
 
+    final candidates = _parseMarkdownTable(message.content);
+    final hasCandidates = candidates != null && candidates.isNotEmpty;
+
     final api = message.apiResponse;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          MarkdownBody(
-            data: message.content,
-            selectable: true,
-            styleSheet: MarkdownStyleSheet(
-              p: const TextStyle(fontSize: 16, color: Color(0xFF333333), height: 1.6),
-              h1: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
-              h2: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
-              h3: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
-              strong: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF333333)),
-              em: const TextStyle(fontStyle: FontStyle.italic, color: Color(0xFF555555)),
-              code: const TextStyle(
-                fontSize: 13,
-                fontFamily: 'monospace',
-                color: Color(0xFF66FF66),
-                backgroundColor: Color(0xFF2D2D2D),
-              ),
-              codeblockDecoration: BoxDecoration(
-                color: const Color(0xFF2D2D2D),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              codeblockPadding: const EdgeInsets.all(12),
-              blockquoteDecoration: const BoxDecoration(
-                color: Color(0xFFF5F5F5),
-                border: Border(left: BorderSide(color: _kAccentColor, width: 4)),
-              ),
-              blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-              blockquote: const TextStyle(fontSize: 15, color: Color(0xFF555555), fontStyle: FontStyle.italic),
-              tableHead: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
-              tableBody: const TextStyle(fontSize: 14, color: Color(0xFF333333)),
-              tableBorder: TableBorder.all(color: const Color(0xFFE0E0E0), width: 1),
-              tableColumnWidth: const FlexColumnWidth(),
-              tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              listBullet: const TextStyle(fontSize: 16, color: _kAccentColor),
-              horizontalRuleDecoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: Color(0xFFE0E0E0), width: 1)),
+          if (hasCandidates)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: Icon(
+                  _showCards ? Icons.article_outlined : Icons.grid_view_rounded,
+                  size: 16,
+                ),
+                label: Text(_showCards ? 'Ver texto' : 'Ver como tarjetas'),
+                style: TextButton.styleFrom(
+                  foregroundColor: _kAccentColor,
+                  textStyle: const TextStyle(fontSize: 12),
+                ),
+                onPressed: () => setState(() => _showCards = !_showCards),
               ),
             ),
-          ),
+          if (hasCandidates && _showCards)
+            _CandidateCardsView(candidates: candidates)
+          else
+            MarkdownBody(
+              data: message.content,
+              selectable: true,
+              styleSheet: MarkdownStyleSheet(
+                p: const TextStyle(fontSize: 16, color: Color(0xFF333333), height: 1.6),
+                h1: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                h2: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                h3: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                strong: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                em: const TextStyle(fontStyle: FontStyle.italic, color: Color(0xFF555555)),
+                code: const TextStyle(
+                  fontSize: 13,
+                  fontFamily: 'monospace',
+                  color: Color(0xFF66FF66),
+                  backgroundColor: Color(0xFF2D2D2D),
+                ),
+                codeblockDecoration: BoxDecoration(
+                  color: const Color(0xFF2D2D2D),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                codeblockPadding: const EdgeInsets.all(12),
+                blockquoteDecoration: const BoxDecoration(
+                  color: Color(0xFFF5F5F5),
+                  border: Border(left: BorderSide(color: _kAccentColor, width: 4)),
+                ),
+                blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                blockquote: const TextStyle(fontSize: 15, color: Color(0xFF555555), fontStyle: FontStyle.italic),
+                tableHead: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                tableBody: const TextStyle(fontSize: 14, color: Color(0xFF333333)),
+                tableBorder: TableBorder.all(color: const Color(0xFFE0E0E0), width: 1),
+                tableColumnWidth: const FlexColumnWidth(),
+                tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                listBullet: const TextStyle(fontSize: 16, color: _kAccentColor),
+                horizontalRuleDecoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: Color(0xFFE0E0E0), width: 1)),
+                ),
+              ),
+            ),
           if (api?.sqlQuery != null || api?.queryExplanation != null) ...[
             const SizedBox(height: 12),
             _ReasoningTile(api: api!),
@@ -781,6 +935,180 @@ class _MessageBubble extends StatelessWidget {
                 onPressed: provider.toggleOptions,
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Candidate cards view ───────────────────────────────────────────────────────
+
+class _CandidateCardsView extends StatelessWidget {
+  const _CandidateCardsView({required this.candidates});
+  final List<_CandidateData> candidates;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: candidates.map((c) => _CandidateCard(candidate: c)).toList(),
+    );
+  }
+}
+
+class _CandidateCard extends StatelessWidget {
+  const _CandidateCard({required this.candidate});
+  final _CandidateData candidate;
+
+  Color _rankColor(int rank) {
+    if (rank == 1) return const Color(0xFFFFB300);
+    if (rank == 2) return const Color(0xFF9E9E9E);
+    if (rank == 3) return const Color(0xFFBF8350);
+    return _kAccentColor;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: _rankColor(candidate.rank),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '${candidate.rank}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  candidate.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (candidate.renta != null) ...[
+            const SizedBox(height: 8),
+            _CardField(label: 'Renta', value: candidate.renta!),
+          ],
+          if (candidate.extra.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            ...candidate.extra.entries
+                .map((e) => _CardField(label: e.key, value: e.value)),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 5,
+            runSpacing: 5,
+            children: [
+              if (candidate.discapacidad != null)
+                _BoolChip(label: 'Discap.', value: candidate.discapacidad!),
+              if (candidate.orfandad != null)
+                _BoolChip(label: 'Orfandad', value: candidate.orfandad!),
+              if (candidate.familiaNumerosa != null)
+                _BoolChip(label: 'Fam. Num.', value: candidate.familiaNumerosa!),
+              if (candidate.resideFuera != null)
+                _BoolChip(label: 'Reside Fuera', value: candidate.resideFuera!),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CardField extends StatelessWidget {
+  const _CardField({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFF888888),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            TextSpan(
+              text: value,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF333333)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BoolChip extends StatelessWidget {
+  const _BoolChip({required this.label, required this.value});
+  final String label;
+  final bool value;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = value ? const Color(0xFF4CAF50) : const Color(0xFFBDBDBD);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: value ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            value ? Icons.check_rounded : Icons.remove,
+            size: 10,
+            color: color,
+          ),
+          const SizedBox(width: 3),
+          Text(label, style: TextStyle(fontSize: 10, color: color)),
         ],
       ),
     );

@@ -123,7 +123,6 @@ Cuando la respuesta incluye una tabla de candidatos, se puede alternar entre vis
 ### Exportación
 - **Gráfica SVG** — descarga directa desde el mensaje de respuesta
 - **Informe PDF** — abre el informe HTML en nueva pestaña y lanza el diálogo de impresión del navegador
-- **Informe HTML** — descarga el informe completo generado en modo Deep
 - **Correo electrónico** — envía el informe al email del usuario autenticado (vía Resend API)
 
 ---
@@ -164,19 +163,11 @@ La app evalúa candidatos según las reglas oficiales de la convocatoria MEC:
 - Renta familiar > umbral 2 para el número de miembros
 
 **Criterios de ranking** (mayor prioridad primero):
-1. Renta por debajo del umbral 1 (mayor necesidad económica)
+1. Renta
 2. Discapacidad reconocida
 3. Orfandad
 4. Familia numerosa
 5. Reside fuera del domicilio familiar
-
----
-
-## Problemas conocidos
-
-1. **`firebase_options.dart`** no está en el repositorio — debe generarse con `flutterfire configure`.
-2. **Sesiones restauradas** desde Firestore no incluyen VQL, gráficas ni preguntas relacionadas (el campo `apiResponse` no se serializa).
-3. Los botones **Exportar / Compartir** del panel de opciones no están implementados.
 
 ---
 

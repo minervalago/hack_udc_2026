@@ -48,6 +48,6 @@ app.*.map.json
 .claude/
 
 # Environment / secrets
-.env
+*.env
 .env.*
 credentials.json
